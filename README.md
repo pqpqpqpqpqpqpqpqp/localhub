@@ -72,27 +72,3 @@
 프로젝트 루트 디렉토리에 `.env` 파일을 생성하고 아래 내용을 입력합니다.
 ```env
 VITE_OPENAI_API_KEY=your_openai_api_key_here
-
-## 챗봇 연동 (OpenAI)
-
-1. 루트에서 `.env.example`을 복사하여 `.env`로 이름을 바꾸고 키를 입력합니다:
-
-```env
-VITE_OPENAI_KEY=your_openai_api_key_here
-```
-
-2. 보안 경고: `VITE_` 접두사가 붙은 환경변수는 클라이언트 번들에 포함됩니다. 실제 서비스에서는 백엔드 프록시 또는 서버 측에서 키를 보관하고 호출하도록 구성하세요.
-
-3. 사용법: 원하는 뷰에 `ChatBot` 컴포넌트를 추가하면 됩니다. 예:
-
-```vue
-<template>
-  <ChatBot />
-</template>
-
-<script setup>
-import ChatBot from '@/components/ChatBot.vue';
-</script>
-```
-
-4. `src/composables/useChatbot.js`는 `import.meta.env.VITE_OPENAI_KEY`에서 키를 읽어 OpenAI Chat Completions API를 호출하며, `context` 옵션으로 시스템 메시지(컨텍스트)를 주입할 수 있습니다.
