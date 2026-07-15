@@ -2,11 +2,16 @@
   <div class="quiet-map-wrap">
     <div id="quiet-map"></div>
 
-    <div :class="['filter-panel', { open: panelOpen }]" @click.self="onPanelBackgroundClick">
+    <!-- 필터 열기/닫기 버튼: 항상 보임, 위치 고정 -->
+    <button class="filter-fab" @click="togglePanel" type="button">
+      {{ showFilter ? '✕ 닫기' : '☰ 필터' }}
+    </button>
+
+    <!-- 필터 패널: showFilter가 true일 때만 보임 -->
+    <div class="filter-panel" :class="{ open: showFilter }" @click.self="onPanelBackgroundClick">
       <div class="panel-inner" :class="{ mobile: isMobile }">
         <header class="panel-header">
           <h3>필터</h3>
-          <button class="toggle-btn" @click.stop="togglePanel">{{ panelOpen ? '닫기' : '열기' }}</button>
         </header>
 
         <section class="filter-section">
@@ -39,8 +44,8 @@
         </section>
 
         <footer class="panel-footer">
-          <button class="reset" @click="resetFilters">초기화</button>
-          <button class="apply" @click="applyFilters">적용</button>
+          <button class="reset" @click="resetFilters" type="button">초기화</button>
+          <button class="apply" @click="applyFilters" type="button">적용</button>
         </footer>
       </div>
     </div>
@@ -66,18 +71,14 @@ const { places, load: loadPlaces } = useQuietPlaces();
 const { list: listPosts } = usePosts();
 
 // UI state
-const panelOpen = ref(false);
+const showFilter = ref(false);
 const isMobile = ref(false);
 const selectedCategories = ref(new Set(CATEGORIES.map(c => c.code)));
 const selectedGu = ref('');
 const minQuiet = ref(1.0);
 
-// derived/enriched data
-const enrichedPlaces = computed(() => {
-  return enrichPlaces(places.value || [], listPosts() || []);
-});
+const enrichedPlaces = computed(() => enrichPlaces(places.value || [], listPosts() || []));
 
-// gu options extracted from place address fields
 const guOptions = computed(() => {
   const set = new Set();
   for (const p of places.value || []) {
@@ -93,7 +94,6 @@ const guOptions = computed(() => {
   return Array.from(set).filter(Boolean).sort();
 });
 
-// filtered/enriched by UI
 const filteredEnriched = computed(() => {
   return (enrichedPlaces.value || []).filter(place => {
     if (selectedCategories.value.size > 0) {
@@ -113,7 +113,6 @@ const filteredEnriched = computed(() => {
   });
 });
 
-// helpers
 function toggleCategory(code) {
   const s = selectedCategories.value;
   if (s.has(code)) s.delete(code);
@@ -128,16 +127,16 @@ function resetFilters() {
 }
 
 function applyFilters() {
-  panelOpen.value = false;
+  showFilter.value = false;
   renderMarkers();
 }
 
 function togglePanel() {
-  panelOpen.value = !panelOpen.value;
+  showFilter.value = !showFilter.value;
 }
 
 function onPanelBackgroundClick() {
-  if (isMobile.value) panelOpen.value = false;
+  if (isMobile.value) showFilter.value = false;
 }
 
 function _toLatLng(place) {
@@ -194,7 +193,6 @@ function renderMarkers() {
   }
 }
 
-// popupopen handler: attach click listener to '이 장소 리뷰 쓰기' button
 function onPopupOpen(e) {
   const popupEl = (e.popup && typeof e.popup.getElement === 'function') ? e.popup.getElement() : (e.popup && e.popup._contentNode) || null;
   if (!popupEl) return;
@@ -213,7 +211,6 @@ function onPopupOpen(e) {
       }
     });
   };
-  // store handler on element so we can remove it later
   btn.__writeHandler = handler;
   btn.addEventListener('click', handler);
 }
@@ -229,7 +226,6 @@ function onPopupClose(e) {
   }
 }
 
-// responsive detection
 function updateIsMobile() {
   isMobile.value = window.matchMedia('(max-width:767px)').matches;
 }
@@ -254,9 +250,9 @@ onMounted(async () => {
   map.on('popupopen', onPopupOpen);
   map.on('popupclose', onPopupClose);
 
-  watch([filteredEnriched], () => {
+  watch(filteredEnriched, () => {
     renderMarkers();
-  }, { deep: true });
+  });
 });
 
 onBeforeUnmount(() => {
@@ -289,60 +285,77 @@ onBeforeUnmount(() => {
   min-height: 500px;
 }
 
-/* Panel base */
+/* 필터 열기/닫기 버튼 — 항상 고정 위치, 네비바(56px) 아래 */
+.filter-fab {
+  position: fixed;
+  top: 72px;
+  right: 16px;
+  z-index: 900;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 20px;
+  background: #0b6e6e;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+/* 필터 패널 — 기본은 화면 밖으로 숨김(닫힘) */
 .filter-panel {
   position: fixed;
-  z-index: 1000;
-  transition: transform 240ms ease, opacity 240ms ease;
+  top: 72px;
+  right: 16px;
+  width: 300px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+  z-index: 850; /* 네비바(보통 500 이상)보다는 낮게, 지도 위로만 */
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+
+  /* 닫힘 상태: 안 보이고 클릭도 안 먹음 */
+  opacity: 0;
+  transform: translateX(24px);
+  pointer-events: none;
+  transition: transform 200ms ease, opacity 200ms ease;
 }
 
-/* Desktop: fixed top-right card */
-@media (min-width: 768px) {
-  .filter-panel {
-    top: 16px;
-    right: 16px;
-    transform: translateY(0);
-    opacity: 1;
-  }
-  .filter-panel .panel-inner {
-    width: 300px;
-    background: rgba(255,255,255,0.95);
-    border-radius: 8px;
-    padding: 12px;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.12);
-  }
+.filter-panel.open {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
 }
 
-/* Mobile: bottom sheet, collapsed by default */
+/* 모바일: 하단 시트로 전환 */
 @media (max-width: 767px) {
+  .filter-fab {
+    top: auto;
+    bottom: 16px;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+  }
+
   .filter-panel {
+    top: auto;
+    bottom: 0;
     left: 0;
     right: 0;
-    bottom: 0;
-    height: auto;
-    pointer-events: none;
-  }
-  .filter-panel .panel-inner {
-    pointer-events: auto;
     width: 100%;
-    background: #fff;
-    border-top-left-radius: 12px;
-    border-top-right-radius: 12px;
-    padding: 12px;
-    box-shadow: 0 -6px 18px rgba(0,0,0,0.12);
-    transform: translateY(88%);
+    max-width: 100%;
+    max-height: 70vh;
+    border-radius: 16px 16px 0 0;
+    transform: translateY(100%);
   }
-  .filter-panel.open .panel-inner {
+
+  .filter-panel.open {
     transform: translateY(0);
-  }
-  .filter-panel .panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
   }
 }
 
-/* Shared inner layout */
 .panel-inner {
   display: flex;
   flex-direction: column;
@@ -360,15 +373,6 @@ onBeforeUnmount(() => {
   font-size: 16px;
 }
 
-.toggle-btn {
-  background: transparent;
-  border: none;
-  color: #333;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-/* filter sections */
 .filter-section {
   display: flex;
   flex-direction: column;
@@ -380,7 +384,6 @@ onBeforeUnmount(() => {
   color: #555;
 }
 
-/* chips */
 .chips {
   display: flex;
   flex-wrap: wrap;
@@ -400,16 +403,15 @@ onBeforeUnmount(() => {
 }
 
 .chip.active {
-  background: linear-gradient(90deg,#e6fffb,#e0fffc);
+  background: linear-gradient(90deg, #e6fffb, #e0fffc);
   border-color: #3aa6a6;
-  box-shadow: 0 1px 0 rgba(0,0,0,0.04);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
 }
 
 .chip .emoji {
   font-size: 14px;
 }
 
-/* footer buttons */
 .panel-footer {
   display: flex;
   justify-content: space-between;
@@ -435,7 +437,6 @@ onBeforeUnmount(() => {
   color: #fff;
 }
 
-/* popup button styling */
 .leaflet-popup-content .write-review-btn {
   margin-top: 8px;
   padding: 6px 8px;
