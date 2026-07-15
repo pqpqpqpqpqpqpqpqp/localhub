@@ -66,7 +66,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
@@ -78,6 +78,7 @@ import { enrichPlaces } from '../composables/useQuietScore';
 import { quietColor, quietLabel, CATEGORIES } from '../data/categories';
 
 const router = useRouter();
+const route = useRoute();
 
 const props = defineProps({
   isHome: {
@@ -88,6 +89,8 @@ const props = defineProps({
 
 let map = null;
 let clusterLayer = null;
+// contentid → marker 매핑 (홈에서 특정 장소로 이동할 때 사용)
+const markerByContentId = new Map();
 
 const { places, load: loadPlaces } = useQuietPlaces();
 const { list: listPosts } = usePosts();
@@ -188,6 +191,7 @@ function escapeHtml(str) {
 function renderMarkers() {
   if (!map || !clusterLayer) return;
   clusterLayer.clearLayers();
+  markerByContentId.clear();
 
   const markers = [];
   for (const place of filteredEnriched.value) {
@@ -230,10 +234,30 @@ function renderMarkers() {
       </div>
     `;
 
-    marker.bindPopup(popupHtml, { minWidth: 210 });
+    marker.bindPopup(popupHtml, { minWidth: 200, maxWidth: 200 });
     markers.push(marker);
+    if (place.contentid) markerByContentId.set(String(place.contentid), marker);
   }
   clusterLayer.addLayers(markers);
+}
+
+// 특정 장소로 이동하고 팝업 열기 (홈 화면에서 진입 시 사용)
+function focusPlace(contentid) {
+  if (!map || !clusterLayer || !contentid) return;
+  const marker = markerByContentId.get(String(contentid));
+  if (!marker) return;
+
+  // 클러스터에 묶여 있으면 펼친 뒤 팝업 열기
+  if (typeof clusterLayer.zoomToShowLayer === 'function') {
+    clusterLayer.zoomToShowLayer(marker, () => {
+      // 이동 애니메이션이 끝난 뒤 팝업이 닫히지 않도록 약간 지연
+      setTimeout(() => marker.openPopup(), 150);
+    });
+  } else {
+    const latlng = marker.getLatLng();
+    map.setView(latlng, 16);
+    setTimeout(() => marker.openPopup(), 300);
+  }
 }
 
 function onPopupOpen(e) {
@@ -302,6 +326,17 @@ onMounted(async () => {
   watch(filteredEnriched, () => {
     renderMarkers();
   });
+
+  // 홈에서 특정 장소를 눌러 들어온 경우 해당 장소로 이동
+  if (!props.isHome && route.query.contentid) {
+    // 마커 렌더 직후 실행되도록 다음 틱에
+    setTimeout(() => focusPlace(route.query.contentid), 300);
+  }
+});
+
+// 지도 화면에 머문 상태로 query만 바뀌어도 반응 (예: 홈→지도 이후 다른 장소 선택)
+watch(() => route.query.contentid, (cid) => {
+  if (!props.isHome && cid) focusPlace(cid);
 });
 
 onBeforeUnmount(() => {
@@ -556,60 +591,36 @@ onBeforeUnmount(() => {
   color: #fff;
 }
 
-.leaflet-popup-content .popup-title {
-  font-weight: 700;
-  font-size: 14px;
-  margin-bottom: 2px;
-}
-
-.leaflet-popup-content .popup-addr {
-  font-size: 12px;
-  color: #777;
-  margin-bottom: 6px;
-}
-
-.leaflet-popup-content .popup-quiet {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-
-.leaflet-popup-content .quiet-badge {
-  color: #fff;
-  font-weight: 700;
-  font-size: 13px;
-  padding: 2px 8px;
+/* Leaflet 팝업 — scoped 환경에서 body 직속 DOM에 적용되도록 전부 :deep() 사용 */
+:deep(.leaflet-popup-content-wrapper) {
   border-radius: 10px;
 }
-
-.leaflet-popup-content .quiet-label {
-  font-size: 12px;
-  color: #555;
+:deep(.leaflet-popup-content) {
+  margin: 10px 12px;
+  width: 200px !important;
+  box-sizing: border-box;
+  overflow: hidden;
 }
-
-.leaflet-popup-content .write-review-btn {
+:deep(.popup-content) {
   width: 100%;
-  padding: 7px 8px;
-  background: #0b6e6e;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 600;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
-
-.leaflet-popup-content .popup-thumb {
+:deep(.popup-content img),
+:deep(.popup-thumb) {
   width: 100%;
+  max-width: 100%;
   height: 110px;
   object-fit: cover;
   border-radius: 6px;
   margin-bottom: 6px;
   display: block;
+  box-sizing: border-box;
 }
-
-.leaflet-popup-content .popup-thumb-empty {
+:deep(.popup-thumb-empty) {
   width: 100%;
+  max-width: 100%;
   height: 110px;
   border-radius: 6px;
   margin-bottom: 6px;
@@ -619,5 +630,45 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   font-size: 13px;
+  box-sizing: border-box;
+}
+:deep(.popup-title) {
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+:deep(.popup-addr) {
+  font-size: 12px;
+  color: #777;
+  margin-bottom: 6px;
+  word-break: break-all;
+}
+:deep(.popup-quiet) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+:deep(.quiet-badge) {
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+:deep(.quiet-label) {
+  font-size: 12px;
+  color: #555;
+}
+:deep(.write-review-btn) {
+  width: 100%;
+  padding: 7px 8px;
+  background: #0b6e6e;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  box-sizing: border-box;
 }
 </style>
