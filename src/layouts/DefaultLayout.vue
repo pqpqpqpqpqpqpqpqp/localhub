@@ -1,20 +1,25 @@
 <template>
-  <div>
+  <div class="site-root">
     <header class="site-header">
-      <nav>
-        <router-link to="/">Home</router-link>
-        <router-link to="/map">Map</router-link>
-        <router-link to="/board">Board</router-link>
-        <router-link to="/post">Write</router-link>
-      </nav>
+      <div class="container header-inner">
+        <div class="brand" @click="$router.push({ name: 'Home' })">LocalHub</div>
+        <nav class="main-nav">
+          <router-link :to="{ name: 'Home' }" class="nav-link">Home</router-link>
+          <router-link :to="{ name: 'Map' }" class="nav-link">Map</router-link>
+          <router-link :to="{ name: 'BoardList' }" class="nav-link">Board</router-link>
+          <router-link :to="{ name: 'PostCreate' }" class="nav-cta">Write</router-link>
+        </nav>
+      </div>
     </header>
 
-    <main>
+    <main class="container main-content">
       <slot />
     </main>
 
     <footer class="site-footer">
-      <small>LocalHub — Seoul</small>
+      <div class="container footer-inner">
+        <small>LocalHub — Seoul · © { new Date().getFullYear() }</small>
+      </div>
     </footer>
   </div>
 </template>
@@ -22,7 +27,98 @@
 <script setup></script>
 
 <style scoped>
-.site-header { padding: 12px; background:#f5f5f5; }
-.site-header nav a { margin-right:12px; }
-.site-footer { padding:12px; text-align:center; background:#fafafa; margin-top:24px; }
+.site-root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #f1f5f9;
+  color: #1e293b;
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+}
+
+.site-header {
+  background-color: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 40px;
+}
+
+.header-inner {
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #4f46e5;
+  cursor: pointer;
+  letter-spacing: -0.5px;
+}
+
+.main-nav {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.nav-link {
+  text-decoration: none;
+  color: #64748b;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.nav-link:hover,
+.router-link-active {
+  color: #1e293b;
+}
+
+.nav-cta {
+  background-color: #4f46e5;
+  color: #ffffff;
+  padding: 8px 16px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.nav-cta:hover {
+  background-color: #4338ca;
+}
+
+.main-content {
+  flex: 1;
+  padding-top: 2rem;
+  padding-bottom: 4rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.site-footer {
+  background-color: #ffffff;
+  border-top: 1px solid #e2e8f0;
+  padding: 2rem 0;
+  color: #94a3b8;
+  text-align: center;
+}
+
+.card {
+  background: white;
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+  padding: 3.5rem;
+}
 </style>

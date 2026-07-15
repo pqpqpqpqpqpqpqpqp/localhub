@@ -1,18 +1,8 @@
-/**
- * [비즈니스 로직] 익명 게시판 CRUD 기능
- * - LocalStorage를 사용해 브라우저에 글 저장/삭제/수정
- * - 백엔드 DB 없이 데이터를 관리하는 핵심 '도구 상자'
- */
 import { ref } from 'vue';
 
 const STORAGE_KEY = 'localhub:posts';
 
-// 모듈 스코프의 반응형 상태 — 앱 전체에서 공유됩니다.
-const posts = ref(loadFromLocal());
-
-/**
- * 비밀번호는 서버가 없으므로 평문 비교합니다 (보안상 위험).
- */
+export const posts = ref(loadFromLocal());
 
 function loadFromLocal() {
   try {
@@ -54,14 +44,12 @@ export function usePosts() {
       contentid: data.contentid ?? null,
       placeTitle: data.placeTitle ?? '',
       lclsSystm3: data.lclsSystm3 ?? null,
-      quietScore:
-        typeof data.quietScore !== 'undefined'
-          ? Number(data.quietScore)
-          : 1,
+      quietScore: typeof data.quietScore !== 'undefined' ? Number(data.quietScore) : 1,
       title: data.title ?? '',
       content: data.content ?? '',
-      // 비밀번호는 평문으로 저장(서버 없음)
       password: data.password ?? '',
+      views: 0,
+      likes: 0,
       createdAt: now,
       updatedAt: now
     };
@@ -102,5 +90,42 @@ export function usePosts() {
     return { ok: true };
   }
 
-  return { list, get, byContentId, create, update, remove };
+  // usePosts() 반환에 추가할 함수들 (파일 내에 위치)
+  function incrementView(id) {
+    const idx = posts.value.findIndex(p => p.id === id);
+    if (idx === -1) return null;
+    posts.value[idx].views = (Number(posts.value[idx].views) || 0) + 1;
+    posts.value[idx].updatedAt = new Date().toISOString();
+    saveToLocal();
+    return posts.value[idx].views;
+  }
+
+  const LIKED_KEY = 'localhub:liked';
+  function _loadLiked() {
+    try { return new Set(JSON.parse(localStorage.getItem(LIKED_KEY) || '[]')); } catch { return new Set(); }
+  }
+  function _saveLiked(set) { localStorage.setItem(LIKED_KEY, JSON.stringify(Array.from(set))); }
+
+  function toggleLike(id) {
+    const idx = posts.value.findIndex(p => p.id === id);
+    if (idx === -1) return { ok: false };
+    const liked = _loadLiked();
+    const already = liked.has(id);
+    if (already) {
+      posts.value[idx].likes = Math.max(0, (posts.value[idx].likes || 0) - 1);
+      liked.delete(id);
+    } else {
+      posts.value[idx].likes = (posts.value[idx].likes || 0) + 1;
+      liked.add(id);
+    }
+    _saveLiked(liked);
+    saveToLocal();
+    return { ok: true, liked: !already, likes: posts.value[idx].likes };
+  }
+
+  function isLiked(id) {
+    return _loadLiked().has(id);
+  }
+
+  return { list, get, byContentId, create, update, remove, posts, incrementView, toggleLike, isLiked };
 }
