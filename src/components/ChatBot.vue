@@ -33,7 +33,7 @@
             v-model="input"
             class="input"
             type="text"
-            placeholder="메시지를 입력하세요..."
+            placeholder="메시지를 입력해 주세요."
             aria-label="메시지 입력"
             @keydown.enter.prevent="send"
           />
@@ -54,7 +54,7 @@ const messages = ref([
   {
     role: 'assistant',
     content:
-      '안녕하세요! 지금 조용히 쉬고 싶은 곳을 찾아드릴게요. 어떤 기분이세요?',
+      '안녕하세요! 조용히 쉬고 싶은 곳을 찾아드릴게요. 지금 어떤 기분이세요?',
   },
 ]);
 const input = ref('');
@@ -207,7 +207,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: #0b6e6e;
+  background: #65c9f0;
   color: #fff;
   border: none;
   display: inline-flex;
@@ -215,7 +215,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
   justify-content: center;
   font-size: 24px;
   cursor: pointer;
-  box-shadow: 0 6px 18px rgba(11, 110, 110, 0.18);
+  box-shadow: 0 6px 18px rgba(160, 219, 242, 0.18);
   transition: transform 0.12s ease;
 }
 .fab:active {
@@ -234,13 +234,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 10px 30px rgba(11, 110, 110, 0.12);
-  border: 1px solid rgba(11, 110, 110, 0.12);
+  /* 강화된 그림자 + 약간의 블러로 배경과 구분 */
+  box-shadow: 0 20px 40px rgba(0,0,0,0.22), 0 6px 18px rgba(160,219,242,0.08);
+  border: 1px solid rgba(160, 219, 242, 0.12);
+  backdrop-filter: blur(6px);
 }
 
 /* Header */
 .panel-header {
-  background: #0b6e6e;
+  background: #65c9f0;
   color: #fff;
   padding: 12px 16px;
   font-weight: 600;
@@ -278,15 +280,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
   border-radius: 12px;
   line-height: 1.3;
   word-break: break-word;
-  box-shadow: 0 2px 8px rgba(11, 110, 110, 0.04);
+  box-shadow: 0 2px 8px rgba(160, 219, 242, 0.04);
 }
 .message.assistant .bubble {
-  background: #eaf8f8;
+  background: #E9EBEF;
   color: #033b3b;
   border-bottom-left-radius: 6px;
 }
 .message.user .bubble {
-  background: #0b6e6e;
+  background: #65c9f0;
   color: #fff;
   border-bottom-right-radius: 6px;
 }
@@ -303,7 +305,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
   display: flex;
   gap: 8px;
   padding: 10px;
-  border-top: 1px solid rgba(11, 110, 110, 0.06);
+  border-top: 1px solid rgba(160, 219, 242, 0.06);
   background: #fff;
 }
 .input {
@@ -314,16 +316,17 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
   outline: none;
 }
 .input:focus {
-  box-shadow: 0 0 0 3px rgba(11, 110, 110, 0.06);
-  border-color: #0b6e6e;
+  box-shadow: 0 0 0 3px rgba(160, 219, 242, 0.06);
+  border-color: #65c9f0;
 }
 .send {
-  background: #0b6e6e;
+  background: #65c9f0;
   color: #fff;
   border: none;
   padding: 8px 12px;
   border-radius: 8px;
   cursor: pointer;
+  font-weight: 600;
 }
 .send:disabled {
   opacity: 0.6;
