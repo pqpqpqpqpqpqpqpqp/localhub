@@ -1,73 +1,66 @@
 <template>
   <div class="quiet-map-wrap">
     <div id="quiet-map"></div>
+    <template v-if="!isHome">
+      <!-- 필터 열기/닫기 버튼 -->
+      <button class="filter-fab" @click="togglePanel" type="button">
+        {{ showFilter ? '✕ 닫기' : '☰ 필터' }}
+      </button>
 
-    <!-- 필터 열기/닫기 버튼 -->
-    <button class="filter-fab" @click="togglePanel" type="button">
-      {{ showFilter ? '✕ 닫기' : '☰ 필터' }}
-    </button>
-
-    <!-- 조용함 지수 범례 -->
-    <div class="legend">
-      <div class="legend-title">조용함 지수</div>
-      <div class="legend-item"><span class="dot" style="background:#0B6E6E"></span>아주 조용 (4.5+)</div>
-      <div class="legend-item"><span class="dot" style="background:#3AA6A6"></span>조용 (3.5+)</div>
-      <div class="legend-item"><span class="dot" style="background:#8FB8B8"></span>보통 (2.5+)</div>
-      <div class="legend-item"><span class="dot" style="background:#B0B0B0"></span>시끄러움</div>
-    </div>
-
-    <!-- 필터 패널 -->
-    <div class="filter-panel" :class="{ open: showFilter }" @click.self="onPanelBackgroundClick">
-      <div class="panel-inner" :class="{ mobile: isMobile }">
-        <header class="panel-header">
-          <h3>필터</h3>
-        </header>
-
-        <section class="filter-section">
-          <label class="section-title">카테고리</label>
-          <div class="chips">
-            <button
-              v-for="c in CATEGORIES"
-              :key="c.code"
-              :class="['chip', { active: selectedCategories.has(c.code) }]"
-              @click="toggleCategory(c.code)"
-              type="button"
-            >
-              <span class="emoji">{{ c.emoji }}</span>
-              <span class="name">{{ c.name }}</span>
-            </button>
-          </div>
-        </section>
-
-        <section class="filter-section">
-          <label class="section-title">자치구</label>
-          <select v-model="selectedGu">
-            <option value="">전체</option>
-            <option v-for="g in guOptions" :key="g" :value="g">{{ g }}</option>
-          </select>
-        </section>
-
-        <section class="filter-section">
-          <label class="section-title">조용함 정도</label>
-          <div class="quiet-levels">
-            <button
-              v-for="lv in QUIET_LEVELS"
-              :key="lv.value"
-              :class="['level-btn', { active: quietLevel === lv.value }]"
-              @click="quietLevel = lv.value"
-              type="button"
-            >
-              {{ lv.label }}
-            </button>
-          </div>
-        </section>
-
-        <footer class="panel-footer">
-          <button class="reset" @click="resetFilters" type="button">초기화</button>
-          <button class="apply" @click="applyFilters" type="button">적용</button>
-        </footer>
+      <!-- 조용함 지수 범례 -->
+      <div class="legend">
+        <div class="legend-title">조용함 지수</div>
+        <div class="legend-item"><span class="dot" style="background:#0B6E6E"></span>아주 조용 (4.5+)</div>
+        <div class="legend-item"><span class="dot" style="background:#3AA6A6"></span>조용 (3.5+)</div>
+        <div class="legend-item"><span class="dot" style="background:#8FB8B8"></span>보통 (2.5+)</div>
+        <div class="legend-item"><span class="dot" style="background:#B0B0B0"></span>시끄러움</div>
       </div>
-    </div>
+
+      <!-- 필터 패널 -->
+      <div class="filter-panel" :class="{ open: showFilter }" @click.self="onPanelBackgroundClick">
+        <div class="panel-inner" :class="{ mobile: isMobile }">
+          <header class="panel-header">
+            <h3>필터</h3>
+          </header>
+
+          <section class="filter-section">
+            <label class="section-title">카테고리</label>
+            <div class="chips">
+              <button v-for="c in CATEGORIES" :key="c.code"
+                :class="['chip', { active: selectedCategories.has(c.code) }]" @click="toggleCategory(c.code)"
+                type="button">
+                <span class="emoji">{{ c.emoji }}</span>
+                <span class="name">{{ c.name }}</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="filter-section">
+            <label class="section-title">자치구</label>
+            <select v-model="selectedGu">
+              <option value="">전체</option>
+              <option v-for="g in guOptions" :key="g" :value="g">{{ g }}</option>
+            </select>
+          </section>
+
+          <section class="filter-section">
+            <label class="section-title">조용함 정도</label>
+            <div class="quiet-levels">
+              <button v-for="lv in QUIET_LEVELS" :key="lv.value"
+                :class="['level-btn', { active: quietLevel === lv.value }]" @click="quietLevel = lv.value"
+                type="button">
+                {{ lv.label }}
+              </button>
+            </div>
+          </section>
+
+          <footer class="panel-footer">
+            <button class="reset" @click="resetFilters" type="button">초기화</button>
+            <button class="apply" @click="applyFilters" type="button">적용</button>
+          </footer>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -85,6 +78,13 @@ import { enrichPlaces } from '../composables/useQuietScore';
 import { quietColor, quietLabel, CATEGORIES } from '../data/categories';
 
 const router = useRouter();
+
+const props = defineProps({
+  isHome: {
+    type: Boolean,
+    default: false
+  }
+});
 
 let map = null;
 let clusterLayer = null;
@@ -277,7 +277,7 @@ onMounted(async () => {
   updateIsMobile();
   window.addEventListener('resize', updateIsMobile);
 
-  showFilter.value = !isMobile.value;
+  showFilter.value = false;
 
   await loadPlaces();
 
@@ -359,11 +359,13 @@ onBeforeUnmount(() => {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
   font-size: 12px;
 }
+
 .legend-title {
   font-weight: 700;
   margin-bottom: 6px;
   color: #333;
 }
+
 .legend-item {
   display: flex;
   align-items: center;
@@ -371,6 +373,7 @@ onBeforeUnmount(() => {
   margin: 2px 0;
   color: #555;
 }
+
 .legend .dot {
   width: 12px;
   height: 12px;
@@ -413,12 +416,14 @@ onBeforeUnmount(() => {
     right: auto;
     transform: translateX(-50%);
   }
+
   .legend {
     left: 8px;
     bottom: 80px;
     font-size: 11px;
     padding: 8px 10px;
   }
+
   .filter-panel {
     top: auto;
     bottom: 0;
@@ -430,6 +435,7 @@ onBeforeUnmount(() => {
     border-radius: 16px 16px 0 0;
     transform: translateY(100%);
   }
+
   .filter-panel.open {
     transform: translateY(0);
   }
@@ -479,6 +485,7 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   gap: 6px;
 }
+
 .level-btn {
   flex: 1 1 calc(50% - 6px);
   padding: 8px 6px;
@@ -489,6 +496,7 @@ onBeforeUnmount(() => {
   font-size: 13px;
   font-weight: 500;
 }
+
 .level-btn.active {
   background: #0b6e6e;
   color: #fff;
@@ -553,17 +561,20 @@ onBeforeUnmount(() => {
   font-size: 14px;
   margin-bottom: 2px;
 }
+
 .leaflet-popup-content .popup-addr {
   font-size: 12px;
   color: #777;
   margin-bottom: 6px;
 }
+
 .leaflet-popup-content .popup-quiet {
   display: flex;
   align-items: center;
   gap: 6px;
   margin-bottom: 8px;
 }
+
 .leaflet-popup-content .quiet-badge {
   color: #fff;
   font-weight: 700;
@@ -571,10 +582,12 @@ onBeforeUnmount(() => {
   padding: 2px 8px;
   border-radius: 10px;
 }
+
 .leaflet-popup-content .quiet-label {
   font-size: 12px;
   color: #555;
 }
+
 .leaflet-popup-content .write-review-btn {
   width: 100%;
   padding: 7px 8px;
@@ -585,6 +598,7 @@ onBeforeUnmount(() => {
   cursor: pointer;
   font-weight: 600;
 }
+
 .leaflet-popup-content .popup-thumb {
   width: 100%;
   height: 110px;
@@ -593,6 +607,7 @@ onBeforeUnmount(() => {
   margin-bottom: 6px;
   display: block;
 }
+
 .leaflet-popup-content .popup-thumb-empty {
   width: 100%;
   height: 110px;
