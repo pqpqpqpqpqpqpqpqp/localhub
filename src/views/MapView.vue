@@ -5,7 +5,12 @@
 </template>
 
 <script setup>
+import { onMounted } from 'vue';
 import QuietMap from '../components/QuietMap.vue';
+
+onMounted(() => {
+  setTimeout(() => window.dispatchEvent(new Event('resize')), 200);
+});
 </script>
 
 <style scoped>
@@ -16,6 +21,8 @@ import QuietMap from '../components/QuietMap.vue';
 }
 
 .map-view > * {
+  flex: 1 1 auto;
+  min-height: 0;
   height: 100%;
 }
 </style>
