@@ -16,7 +16,6 @@ dist
 dist-ssr
 coverage
 *.local
-.env
 .env.*
 !.env.example
 
