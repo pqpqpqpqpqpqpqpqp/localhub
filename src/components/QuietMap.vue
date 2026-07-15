@@ -258,6 +258,7 @@ function focusPlace(contentid) {
     map.setView(latlng, 16);
     setTimeout(() => marker.openPopup(), 300);
   }
+  clusterLayer.addLayers(markers);
 }
 
 function onPopupOpen(e) {
@@ -470,7 +471,6 @@ onBeforeUnmount(() => {
     border-radius: 16px 16px 0 0;
     transform: translateY(100%);
   }
-
   .filter-panel.open {
     transform: translateY(0);
   }
@@ -670,5 +670,25 @@ onBeforeUnmount(() => {
   cursor: pointer;
   font-weight: 600;
   box-sizing: border-box;
+}
+.leaflet-popup-content .popup-thumb {
+  width: 100%;
+  height: 110px;
+  object-fit: cover;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  display: block;
+}
+.leaflet-popup-content .popup-thumb-empty {
+  width: 100%;
+  height: 110px;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  background: #eef4f4;
+  color: #8fb8b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
 }
 </style>
