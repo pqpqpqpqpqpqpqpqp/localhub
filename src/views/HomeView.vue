@@ -10,7 +10,7 @@
                 </div>
             </div>
             <div class="hero-right">
-                <QuietMap class="mini-map" />
+                <QuietMap class="mini-map" is-home />
             </div>
         </section>
 
