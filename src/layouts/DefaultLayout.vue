@@ -5,7 +5,7 @@
         <router-link to="/">Home</router-link>
         <router-link to="/map">Map</router-link>
         <router-link to="/board">Board</router-link>
-        <router-link to="/post">Write</router-link>
+        <router-link :to="{ name: 'PostCreate' }">Write</router-link>
       </nav>
     </header>
 
