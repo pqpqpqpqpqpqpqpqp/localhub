@@ -2,12 +2,21 @@
   <div class="quiet-map-wrap">
     <div id="quiet-map"></div>
 
-    <!-- 필터 열기/닫기 버튼: 항상 보임, 위치 고정 -->
+    <!-- 필터 열기/닫기 버튼 -->
     <button class="filter-fab" @click="togglePanel" type="button">
       {{ showFilter ? '✕ 닫기' : '☰ 필터' }}
     </button>
 
-    <!-- 필터 패널: showFilter가 true일 때만 보임 -->
+    <!-- 조용함 지수 범례 -->
+    <div class="legend">
+      <div class="legend-title">조용함 지수</div>
+      <div class="legend-item"><span class="dot" style="background:#0B6E6E"></span>아주 조용 (4.5+)</div>
+      <div class="legend-item"><span class="dot" style="background:#3AA6A6"></span>조용 (3.5+)</div>
+      <div class="legend-item"><span class="dot" style="background:#8FB8B8"></span>보통 (2.5+)</div>
+      <div class="legend-item"><span class="dot" style="background:#B0B0B0"></span>시끄러움</div>
+    </div>
+
+    <!-- 필터 패널 -->
     <div class="filter-panel" :class="{ open: showFilter }" @click.self="onPanelBackgroundClick">
       <div class="panel-inner" :class="{ mobile: isMobile }">
         <header class="panel-header">
@@ -39,17 +48,18 @@
         </section>
 
         <section class="filter-section">
-          <label class="section-title">
-            조용함 지수: {{ quietFilterActive ? minQuiet : '전체' }}
-          </label>
-          <input
-            type="range"
-            min="1"
-            max="5"
-            step="1"
-            v-model.number="minQuiet"
-            @input="onQuietSliderChange"
-          />
+          <label class="section-title">조용함 정도</label>
+          <div class="quiet-levels">
+            <button
+              v-for="lv in QUIET_LEVELS"
+              :key="lv.value"
+              :class="['level-btn', { active: quietLevel === lv.value }]"
+              @click="quietLevel = lv.value"
+              type="button"
+            >
+              {{ lv.label }}
+            </button>
+          </div>
         </section>
 
         <footer class="panel-footer">
@@ -66,30 +76,41 @@ import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet.markercluster/dist/MarkerCluster.css';
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
+import 'leaflet.markercluster';
 import { useQuietPlaces } from '../composables/usePlaces';
 import { usePosts } from '../composables/usePosts';
 import { enrichPlaces } from '../composables/useQuietScore';
-import { quietColor, CATEGORIES } from '../data/categories';
+import { quietColor, quietLabel, CATEGORIES } from '../data/categories';
 
 const router = useRouter();
 
 let map = null;
-let markersLayer = null;
+let clusterLayer = null;
 
 const { places, load: loadPlaces } = useQuietPlaces();
 const { list: listPosts } = usePosts();
 
+// 조용함 등급 필터 (색상 기준과 동일: 이상 개념)
+const QUIET_LEVELS = [
+  { value: 0, label: '전체' },
+  { value: 2.5, label: '보통 이상' },
+  { value: 3.5, label: '조용 이상' },
+  { value: 4.5, label: '아주 조용' },
+];
+
 // UI state
-const showFilter = ref(false); // onMounted에서 데스크톱이면 열도록 설정
+const showFilter = ref(false);
 const isMobile = ref(false);
 const selectedCategories = ref(new Set(CATEGORIES.map(c => c.code)));
 const selectedGu = ref('');
-const minQuiet = ref(1);
-const quietFilterActive = ref(false); // 슬라이더를 건드리기 전엔 전체 노출
+const quietLevel = ref(0); // 0 = 전체
+
+const emojiByCode = Object.fromEntries(CATEGORIES.map(c => [c.code, c.emoji]));
 
 const enrichedPlaces = computed(() => enrichPlaces(places.value || [], listPosts() || []));
 
-// 자치구 목록 — "구"로 끝나는 토큰만 추출 ("서울특별시" 같은 "시" 토큰 제외)
 const guOptions = computed(() => {
   const set = new Set();
   for (const p of places.value || []) {
@@ -115,11 +136,9 @@ const filteredEnriched = computed(() => {
       const addr = place.addr1 ?? place.addr ?? '';
       if (!String(addr).includes(selectedGu.value)) return false;
     }
-    // 슬라이더를 건드렸을 때만 조용함 지수로 정확히 필터링
-    if (quietFilterActive.value) {
-      if (typeof place.finalQuiet === 'number') {
-        if (Math.round(place.finalQuiet) !== minQuiet.value) return false;
-      } else {
+    // 조용함 등급: 선택한 값 이상만 표시 (0이면 전체)
+    if (quietLevel.value > 0) {
+      if (typeof place.finalQuiet !== 'number' || place.finalQuiet < quietLevel.value) {
         return false;
       }
     }
@@ -134,15 +153,10 @@ function toggleCategory(code) {
   selectedCategories.value = new Set([...s]);
 }
 
-function onQuietSliderChange() {
-  quietFilterActive.value = true;
-}
-
 function resetFilters() {
   selectedCategories.value = new Set(CATEGORIES.map(c => c.code));
   selectedGu.value = '';
-  minQuiet.value = 1;
-  quietFilterActive.value = false;
+  quietLevel.value = 0;
 }
 
 function applyFilters() {
@@ -172,32 +186,32 @@ function escapeHtml(str) {
 }
 
 function renderMarkers() {
-  if (!map || !markersLayer) return;
-  markersLayer.clearLayers();
-  const bounds = map.getBounds();
+  if (!map || !clusterLayer) return;
+  clusterLayer.clearLayers();
 
+  const markers = [];
   for (const place of filteredEnriched.value) {
     const latlng = _toLatLng(place);
     if (!latlng) continue;
-    if (!bounds.contains(latlng)) continue;
 
     const color = quietColor(place.finalQuiet);
     const marker = L.circleMarker(latlng, {
       radius: 8,
       fillColor: color,
-      color,
-      weight: 1,
+      color: '#fff',
+      weight: 2,
       opacity: 1,
       fillOpacity: 0.9
     });
 
     const title = escapeHtml(place.title ?? place.placeTitle ?? place.facltNm ?? '이름 없음');
     const address = escapeHtml(place.addr1 ?? place.addr ?? '');
-    const quiet = typeof place.finalQuiet !== 'undefined' ? place.finalQuiet : '-';
+    const quiet = typeof place.finalQuiet === 'number' ? place.finalQuiet.toFixed(1) : '-';
+    const label = quietLabel(place.finalQuiet);
     const reviews = typeof place.reviewCount !== 'undefined' ? place.reviewCount : 0;
     const contentid = escapeHtml(place.contentid ?? '');
+    const emoji = emojiByCode[place.lclsSystm3] || '📍';
 
-    // 썸네일 이미지 (없으면 대체 박스)
     const image = place.firstimage2 || place.firstimage || '';
     const imageHtml = image
       ? `<img src="${image}" class="popup-thumb" onerror="this.style.display='none'" />`
@@ -206,17 +220,20 @@ function renderMarkers() {
     const popupHtml = `
       <div class="popup-content">
         ${imageHtml}
-        <strong>${title}</strong><br/>
-        ${address}<br/>
-        조용함 지수: ${quiet}<br/>
-        리뷰: ${reviews}<br/>
+        <div class="popup-title">${emoji} ${title}</div>
+        <div class="popup-addr">${address}</div>
+        <div class="popup-quiet">
+          <span class="quiet-badge" style="background:${color}">${quiet}</span>
+          <span class="quiet-label">${label} · 리뷰 ${reviews}건</span>
+        </div>
         <button class="write-review-btn" data-write-btn data-contentid="${contentid}">이 장소 리뷰 쓰기</button>
       </div>
     `;
 
-    marker.bindPopup(popupHtml, { minWidth: 200 });
-    markersLayer.addLayer(marker);
+    marker.bindPopup(popupHtml, { minWidth: 210 });
+    markers.push(marker);
   }
+  clusterLayer.addLayers(markers);
 }
 
 function onPopupOpen(e) {
@@ -260,7 +277,6 @@ onMounted(async () => {
   updateIsMobile();
   window.addEventListener('resize', updateIsMobile);
 
-  // 데스크톱이면 필터 기본 열림, 모바일이면 닫힘
   showFilter.value = !isMobile.value;
 
   await loadPlaces();
@@ -271,11 +287,15 @@ onMounted(async () => {
     attribution: '© OpenStreetMap contributors | 출처: 한국관광공사 TourAPI'
   }).addTo(map);
 
-  markersLayer = L.layerGroup().addTo(map);
+  clusterLayer = L.markerClusterGroup({
+    showCoverageOnHover: false,
+    maxClusterRadius: 50,
+    spiderfyOnMaxZoom: true
+  });
+  map.addLayer(clusterLayer);
 
   renderMarkers();
 
-  map.on('moveend', renderMarkers);
   map.on('popupopen', onPopupOpen);
   map.on('popupclose', onPopupClose);
 
@@ -287,12 +307,11 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.removeEventListener('resize', updateIsMobile);
   if (map) {
-    map.off('moveend', renderMarkers);
     map.off('popupopen', onPopupOpen);
     map.off('popupclose', onPopupClose);
-    if (markersLayer) {
-      markersLayer.clearLayers();
-      markersLayer = null;
+    if (clusterLayer) {
+      clusterLayer.clearLayers();
+      clusterLayer = null;
     }
     map.remove();
     map = null;
@@ -314,7 +333,6 @@ onBeforeUnmount(() => {
   min-height: 500px;
 }
 
-/* 필터 열기/닫기 버튼 — 항상 고정 위치, 최상단 */
 .filter-fab {
   position: fixed;
   top: 72px;
@@ -330,7 +348,38 @@ onBeforeUnmount(() => {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
 }
 
-/* 필터 패널 — 기본은 화면 밖으로 숨김(닫힘) */
+.legend {
+  position: fixed;
+  left: 16px;
+  bottom: 32px;
+  z-index: 1500;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  font-size: 12px;
+}
+.legend-title {
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: #333;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0;
+  color: #555;
+}
+.legend .dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #ddd;
+}
+
 .filter-panel {
   position: fixed;
   top: 72px;
@@ -339,12 +388,11 @@ onBeforeUnmount(() => {
   max-width: calc(100vw - 32px);
   max-height: calc(100vh - 96px);
   overflow-y: auto;
-  z-index: 2000; /* Leaflet 내부 요소보다 확실히 위 */
+  z-index: 2000;
   background: rgba(255, 255, 255, 0.98);
   border-radius: 12px;
   padding: 14px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
-
   opacity: 0;
   transform: translateX(24px);
   pointer-events: none;
@@ -357,7 +405,6 @@ onBeforeUnmount(() => {
   pointer-events: auto;
 }
 
-/* 모바일: 하단 시트로 전환 */
 @media (max-width: 767px) {
   .filter-fab {
     top: auto;
@@ -366,7 +413,12 @@ onBeforeUnmount(() => {
     right: auto;
     transform: translateX(-50%);
   }
-
+  .legend {
+    left: 8px;
+    bottom: 80px;
+    font-size: 11px;
+    padding: 8px 10px;
+  }
   .filter-panel {
     top: auto;
     bottom: 0;
@@ -378,7 +430,6 @@ onBeforeUnmount(() => {
     border-radius: 16px 16px 0 0;
     transform: translateY(100%);
   }
-
   .filter-panel.open {
     transform: translateY(0);
   }
@@ -412,9 +463,7 @@ onBeforeUnmount(() => {
   color: #555;
 }
 
-/* select / range 입력이 확실히 클릭/드래그되도록 */
-.filter-section select,
-.filter-section input[type='range'] {
+.filter-section select {
   width: 100%;
   -webkit-appearance: auto;
   appearance: auto;
@@ -422,6 +471,28 @@ onBeforeUnmount(() => {
   pointer-events: auto;
   position: relative;
   z-index: 1;
+}
+
+/* 조용함 등급 버튼 */
+.quiet-levels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.level-btn {
+  flex: 1 1 calc(50% - 6px);
+  padding: 8px 6px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+.level-btn.active {
+  background: #0b6e6e;
+  color: #fff;
+  border-color: #0b6e6e;
 }
 
 .chips {
@@ -477,10 +548,36 @@ onBeforeUnmount(() => {
   color: #fff;
 }
 
-/* Leaflet 팝업 내부 (전역 DOM에 삽입되므로 scoped 밖으로 취급됨) */
+.leaflet-popup-content .popup-title {
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+.leaflet-popup-content .popup-addr {
+  font-size: 12px;
+  color: #777;
+  margin-bottom: 6px;
+}
+.leaflet-popup-content .popup-quiet {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.leaflet-popup-content .quiet-badge {
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.leaflet-popup-content .quiet-label {
+  font-size: 12px;
+  color: #555;
+}
 .leaflet-popup-content .write-review-btn {
-  margin-top: 8px;
-  padding: 6px 8px;
+  width: 100%;
+  padding: 7px 8px;
   background: #0b6e6e;
   color: #fff;
   border: none;
@@ -488,7 +585,6 @@ onBeforeUnmount(() => {
   cursor: pointer;
   font-weight: 600;
 }
-
 .leaflet-popup-content .popup-thumb {
   width: 100%;
   height: 110px;
@@ -497,7 +593,6 @@ onBeforeUnmount(() => {
   margin-bottom: 6px;
   display: block;
 }
-
 .leaflet-popup-content .popup-thumb-empty {
   width: 100%;
   height: 110px;
