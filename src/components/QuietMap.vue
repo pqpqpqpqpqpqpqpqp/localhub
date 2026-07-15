@@ -39,8 +39,17 @@
         </section>
 
         <section class="filter-section">
-          <label class="section-title">최소 조용함 지수: {{ minQuiet }}</label>
-          <input type="range" min="1" max="5" step="0.1" v-model.number="minQuiet" />
+          <label class="section-title">
+            조용함 지수: {{ quietFilterActive ? minQuiet : '전체' }}
+          </label>
+          <input
+            type="range"
+            min="1"
+            max="5"
+            step="1"
+            v-model.number="minQuiet"
+            @input="onQuietSliderChange"
+          />
         </section>
 
         <footer class="panel-footer">
@@ -71,25 +80,27 @@ const { places, load: loadPlaces } = useQuietPlaces();
 const { list: listPosts } = usePosts();
 
 // UI state
-const showFilter = ref(false);
+const showFilter = ref(false); // onMounted에서 데스크톱이면 열도록 설정
 const isMobile = ref(false);
 const selectedCategories = ref(new Set(CATEGORIES.map(c => c.code)));
 const selectedGu = ref('');
-const minQuiet = ref(1.0);
+const minQuiet = ref(1);
+const quietFilterActive = ref(false); // 슬라이더를 건드리기 전엔 전체 노출
 
 const enrichedPlaces = computed(() => enrichPlaces(places.value || [], listPosts() || []));
 
+// 자치구 목록 — "구"로 끝나는 토큰만 추출 ("서울특별시" 같은 "시" 토큰 제외)
 const guOptions = computed(() => {
   const set = new Set();
   for (const p of places.value || []) {
     const addr = p.addr1 ?? p.addr ?? p.address ?? '';
     if (addr) {
       const parts = String(addr).split(/\s+/);
-      const gu = parts.find(t => /구$|시$/.test(t));
+      const gu = parts.find(t => /.+구$/.test(t));
       if (gu) set.add(gu);
     }
-    if (p.sggNm) set.add(p.sggNm);
-    if (p.sigunguNm) set.add(p.sigunguNm);
+    if (p.sggNm && /.+구$/.test(p.sggNm)) set.add(p.sggNm);
+    if (p.sigunguNm && /.+구$/.test(p.sigunguNm)) set.add(p.sigunguNm);
   }
   return Array.from(set).filter(Boolean).sort();
 });
@@ -104,10 +115,13 @@ const filteredEnriched = computed(() => {
       const addr = place.addr1 ?? place.addr ?? '';
       if (!String(addr).includes(selectedGu.value)) return false;
     }
-    if (typeof place.finalQuiet === 'number') {
-      if (place.finalQuiet < minQuiet.value) return false;
-    } else {
-      return false;
+    // 슬라이더를 건드렸을 때만 조용함 지수로 정확히 필터링
+    if (quietFilterActive.value) {
+      if (typeof place.finalQuiet === 'number') {
+        if (Math.round(place.finalQuiet) !== minQuiet.value) return false;
+      } else {
+        return false;
+      }
     }
     return true;
   });
@@ -120,10 +134,15 @@ function toggleCategory(code) {
   selectedCategories.value = new Set([...s]);
 }
 
+function onQuietSliderChange() {
+  quietFilterActive.value = true;
+}
+
 function resetFilters() {
   selectedCategories.value = new Set(CATEGORIES.map(c => c.code));
   selectedGu.value = '';
-  minQuiet.value = 1.0;
+  minQuiet.value = 1;
+  quietFilterActive.value = false;
 }
 
 function applyFilters() {
@@ -178,8 +197,15 @@ function renderMarkers() {
     const reviews = typeof place.reviewCount !== 'undefined' ? place.reviewCount : 0;
     const contentid = escapeHtml(place.contentid ?? '');
 
+    // 썸네일 이미지 (없으면 대체 박스)
+    const image = place.firstimage2 || place.firstimage || '';
+    const imageHtml = image
+      ? `<img src="${image}" class="popup-thumb" onerror="this.style.display='none'" />`
+      : `<div class="popup-thumb popup-thumb-empty">이미지 없음</div>`;
+
     const popupHtml = `
       <div class="popup-content">
+        ${imageHtml}
         <strong>${title}</strong><br/>
         ${address}<br/>
         조용함 지수: ${quiet}<br/>
@@ -188,7 +214,7 @@ function renderMarkers() {
       </div>
     `;
 
-    marker.bindPopup(popupHtml);
+    marker.bindPopup(popupHtml, { minWidth: 200 });
     markersLayer.addLayer(marker);
   }
 }
@@ -233,6 +259,9 @@ function updateIsMobile() {
 onMounted(async () => {
   updateIsMobile();
   window.addEventListener('resize', updateIsMobile);
+
+  // 데스크톱이면 필터 기본 열림, 모바일이면 닫힘
+  showFilter.value = !isMobile.value;
 
   await loadPlaces();
 
@@ -285,12 +314,12 @@ onBeforeUnmount(() => {
   min-height: 500px;
 }
 
-/* 필터 열기/닫기 버튼 — 항상 고정 위치, 네비바(56px) 아래 */
+/* 필터 열기/닫기 버튼 — 항상 고정 위치, 최상단 */
 .filter-fab {
   position: fixed;
   top: 72px;
   right: 16px;
-  z-index: 900;
+  z-index: 2100;
   padding: 8px 16px;
   border: none;
   border-radius: 20px;
@@ -310,13 +339,12 @@ onBeforeUnmount(() => {
   max-width: calc(100vw - 32px);
   max-height: calc(100vh - 96px);
   overflow-y: auto;
-  z-index: 850; /* 네비바(보통 500 이상)보다는 낮게, 지도 위로만 */
+  z-index: 2000; /* Leaflet 내부 요소보다 확실히 위 */
   background: rgba(255, 255, 255, 0.98);
   border-radius: 12px;
   padding: 14px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
 
-  /* 닫힘 상태: 안 보이고 클릭도 안 먹음 */
   opacity: 0;
   transform: translateX(24px);
   pointer-events: none;
@@ -384,6 +412,18 @@ onBeforeUnmount(() => {
   color: #555;
 }
 
+/* select / range 입력이 확실히 클릭/드래그되도록 */
+.filter-section select,
+.filter-section input[type='range'] {
+  width: 100%;
+  -webkit-appearance: auto;
+  appearance: auto;
+  cursor: pointer;
+  pointer-events: auto;
+  position: relative;
+  z-index: 1;
+}
+
 .chips {
   display: flex;
   flex-wrap: wrap;
@@ -437,6 +477,7 @@ onBeforeUnmount(() => {
   color: #fff;
 }
 
+/* Leaflet 팝업 내부 (전역 DOM에 삽입되므로 scoped 밖으로 취급됨) */
 .leaflet-popup-content .write-review-btn {
   margin-top: 8px;
   padding: 6px 8px;
@@ -446,5 +487,27 @@ onBeforeUnmount(() => {
   border-radius: 6px;
   cursor: pointer;
   font-weight: 600;
+}
+
+.leaflet-popup-content .popup-thumb {
+  width: 100%;
+  height: 110px;
+  object-fit: cover;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.leaflet-popup-content .popup-thumb-empty {
+  width: 100%;
+  height: 110px;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  background: #eef4f4;
+  color: #8fb8b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
 }
 </style>
