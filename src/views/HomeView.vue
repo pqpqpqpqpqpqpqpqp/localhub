@@ -10,7 +10,7 @@
                 </div>
             </div>
             <div class="hero-right">
-                <QuietMap class="mini-map" />
+                <QuietMap class="mini-map" is-home />
             </div>
         </section>
 
@@ -23,9 +23,6 @@
                                 class="quiet">· 조용함 {{ p.finalQuiet ?? '-' }}</span></button>
                     </li>
                 </ul>
-                <div class="more">
-                    <button class="small" @click="goMap">더보기 →</button>
-                </div>
             </div>
 
             <div class="card list-card">
