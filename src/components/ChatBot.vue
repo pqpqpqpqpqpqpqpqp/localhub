@@ -50,13 +50,19 @@
 import { ref, nextTick, onMounted, onBeforeUnmount } from 'vue';
 
 const isOpen = ref(false);
-const messages = ref([
-  {
+
+const savedMessages = localStorage.getItem('chatbot-history');
+const messages = ref(
+  savedMessages
+    ? JSON.parse(savedMessages)
+    : [
+      {
     role: 'assistant',
-    content:
-      '안녕하세요! 조용히 쉬고 싶은 곳을 찾아드릴게요. 지금 어떤 기분이세요?',
+    content: '안녕하세요! 조용히 쉬고 싶은 곳을 찾아드릴게요. 지금 어떤 기분이세요?',
   },
-]);
+]
+);
+
 const input = ref('');
 const loading = ref(false);
 const messagesRef = ref(null);
@@ -74,6 +80,7 @@ async function scrollToBottom() {
 
 function addMessage(role, content) {
   messages.value.push({ role, content });
+  localStorage.setItem('chatbot_history', JSON.stringify(messages.value));
   scrollToBottom();
 }
 
@@ -94,6 +101,7 @@ async function send() {
     loading.value = false;
   }
 }
+
 
 /*
   callOpenAI: OpenAI Chat Completions 호출 구현
