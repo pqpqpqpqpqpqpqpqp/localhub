@@ -8,7 +8,7 @@ import { ref } from 'vue';
 const STORAGE_KEY = 'localhub:posts';
 
 // 모듈 스코프의 반응형 상태 — 앱 전체에서 공유됩니다.
-const posts = ref(loadFromLocal());
+export const posts = ref(loadFromLocal());
 
 /**
  * 비밀번호는 서버가 없으므로 평문 비교합니다 (보안상 위험).
@@ -102,5 +102,5 @@ export function usePosts() {
     return { ok: true };
   }
 
-  return { list, get, byContentId, create, update, remove };
+  return { list, get, byContentId, create, update, remove, posts };
 }
