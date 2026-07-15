@@ -5,18 +5,24 @@
 </template>
 
 <script setup>
+import { onMounted } from 'vue';
 import QuietMap from '../components/QuietMap.vue';
+
+onMounted(() => {
+  setTimeout(() => window.dispatchEvent(new Event('resize')), 200);
+});
 </script>
 
 <style scoped>
 .map-view {
-  width: 80vw;
-  height: 50vh; /* 화면 전체 높이에 맞춤 */
+  width: 100%;
+  height: calc(100vh - 200px);
   min-height: 500px;
 }
 
-/* 자식 컴포넌트의 루트 노드가 부모 높이를 물려받도록 보장 */
 .map-view > * {
+  flex: 1 1 auto;
+  min-height: 0;
   height: 100%;
 }
 </style>
