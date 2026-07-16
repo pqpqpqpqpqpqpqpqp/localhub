@@ -52,12 +52,12 @@ src/
 ├── components/
 │   ├── ChatBot.vue            # 챗봇 컴포넌트
 │   └── QuietMap.vue           # 지도 시각화 컴포넌트
-├── composables/
-│   ├── usePosts.js            # 게시판 비즈니스 로직
-│   └── useQuietScore.js       # 조용함 지수 산출 로직
-└── public/data/
-    ├── quiet_places_seoul.json # 서울시 장소 원본 데이터
-    └── quiet_index_lite.json  # 조용함 지수 가공 데이터
+└── composables/
+    ├── usePosts.js            # 게시판 비즈니스 로직
+    └── useQuietScore.js       # 조용함 지수 산출 로직
+public/data/
+├── quiet_places_seoul.json # 서울시 장소 원본 데이터
+└── quiet_index_lite.json  # 조용함 지수 가공 데이터
 ```
 
 ---
