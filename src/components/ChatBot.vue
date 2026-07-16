@@ -54,7 +54,6 @@ import { ref, nextTick, onMounted, onBeforeUnmount } from 'vue';
 const isOpen = ref(false);
 const CHAT_HISTORY_KEY = 'chatbot-history';
 
-// 챗봇 시작 시 보여줄 첫 인사말
 const messages = ref([
   {
     role: 'assistant',
@@ -67,6 +66,29 @@ const loading = ref(false);
 const messagesRef = ref(null);
 const recentRecommendations = ref([]);
 
+
+function isValidInput(text) {
+  const t = text.trim();
+  
+
+  if (t.length <= 1) return false;
+
+  
+  if (/(\w|\D)\1\1+/.test(t)) {
+    return false;
+  }
+ 
+  if (/^[ㄱ-ㅎㅏ-ㅣ\s]+$/.test(t)) {
+    return false;
+  }
+
+  const badWords = ['바보', '멍청이', '쓰레기', '시발', '지랄', '개새끼', '존나', '엿'];
+  const hasBadWord = badWords.some(word => t.includes(word));
+  if (hasBadWord) return false;
+
+  return true;
+}
+
 function toggle() {
   isOpen.value = !isOpen.value;
   if (isOpen.value) nextTick(() => scrollToBottom());
@@ -78,7 +100,6 @@ async function scrollToBottom() {
   if (el) el.scrollTop = el.scrollHeight;
 }
 
-// 메시지 추가 및 로컬스토리지 임시 백업 (단순 대화 유지용)
 function addMessage(role, content) {
   messages.value.push({ role, content });
   localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(messages.value));
@@ -89,8 +110,20 @@ async function send() {
   const text = (input.value || '').trim();
   if (!text || loading.value) return;
 
+
   addMessage('user', text);
   input.value = '';
+
+  
+  if (!isValidInput(text)) {
+    loading.value = true;
+    setTimeout(() => {
+      addMessage('assistant', '적절치 않은 단어입니다. 다시 입력해 주세요.');
+      loading.value = false;
+    }, 600);
+    return; 
+  }
+
   loading.value = true;
 
   try {
@@ -131,12 +164,14 @@ function detectIntent(text) {
 
   if (/(도서관|책|독서|공부|학습|스터디)/.test(t)) {
     intent.category = '도서관';
-  } else if (/(공원|산책|자연|한강|나무|풀|러닝)/.test(t)) {
+  } else if (/(공원|산책|자연|한강|나무|풀|숲|둘레길|러닝)/.test(t)) {
     intent.category = '공원';
   } else if (/(카페|커피|음료|디저트|차)/.test(t)) {
     intent.category = '카페';
-  } else if (/(박물관|미술|전시|문화|예술|전시회|갤러리)/.test(t)) {
+  } else if (/(박물관|미술|전시|문화|예술|전시회|갤러리|미술관)/.test(t)) {
     intent.category = '문화';
+  } else if (/(사찰|절)/.test(t)) {
+    intent.category = '사찰';
   } else if (/(휴식|힐링|쉼|명상|감정|정리|마음|재충전)/.test(t)) {
     intent.category = '휴식';
   }
@@ -144,12 +179,59 @@ function detectIntent(text) {
   return intent;
 }
 
+function normalizeCategoryKeyword(keyword) {
+  const k = (keyword || '').toLowerCase();
+
+  if (/(사찰|절|명상|휴식|힐링|쉼|재충전)/.test(k)) {
+    return ['사찰'];
+  }
+  if (/(공원|산책|자연|한강|나무|풀|숲|둘레길|러닝)/.test(k)) {
+    return ['공원/자연', '호수/근린공원', '둘레길/숲길', '공원'];
+  }
+  if (/(미술관|갤러리|전시|예술|문화|전시회|미술)/.test(k)) {
+    return ['미술관/갤러리', '박물관', '미술관', '문화'];
+  }
+  if (/(박물관|역사)/.test(k)) {
+    return ['박물관'];
+  }
+  if (/(도서관|책|독서|공부|학습|스터디)/.test(k)) {
+    return ['도서관'];
+  }
+  if (/(카페|커피|음료|디저트|차)/.test(k)) {
+    return ['카페'];
+  }
+
+  return [];
+}
+
+function matchesCategory(item, categoryTargets) {
+  const cat = (getItemCategory(item) || '').toLowerCase();
+  const name = (getItemName(item) || '').toLowerCase();
+
+  return categoryTargets.some((target) => {
+    const t = target.toLowerCase();
+    return cat.includes(t) || name.includes(t);
+  });
+}
+
+function getItemName(item) {
+  return item.title || item.name || '장소';
+}
+
+function getItemCategory(item) {
+  return item.catName || item.cat || '장소';
+}
+
+function getItemQuietLevel(item) {
+  return item.baseQuiet ?? item.q ?? 0;
+}
+
 function getReplyStyle(mood, intent) {
   if (mood.vibe === 'recharge') return '피로를 풀 수 있는';
   if (mood.vibe === 'focus') return '집중에 도움이 되는';
   if (mood.vibe === 'romantic') return '분위기 있게 즐길 수 있는';
-  if (intent.wantsMoreQuiet) return '더 한적한';
-  if (intent.category) return `${intent.category} 느낌의`;
+  if (intent?.wantsMoreQuiet) return '더 한적한';
+  if (intent?.category) return `${intent.category} 느낌의`;
   return '편안한';
 }
 
@@ -163,97 +245,119 @@ function getReasonText(item, mood, intent) {
   if (mood.vibe === 'romantic') {
     return '감성적인 풍경과 잔잔한 분위기가 잘 어우러져요.';
   }
-  if (intent.category === '도서관') {
+  if (intent?.category === '도서관') {
     return '책과 조용한 분위기가 잘 어우러지는 곳이에요.';
   }
-  if (intent.category === '공원') {
+  if (intent?.category === '공원') {
     return '자연을 느끼며 산책하기 좋은 공간이에요.';
   }
-  if (intent.category === '카페') {
+  if (intent?.category === '카페') {
     return '커피와 함께 여유를 즐기기 좋은 곳이에요.';
   }
-  if (intent.category === '문화') {
+  if (intent?.category === '문화' || intent?.category === '박물관') {
     return '아늑한 분위기 속에서 감상을 즐기기 좋아요.';
   }
-  if (intent.category === '휴식') {
+  if (intent?.category === '휴식' || intent?.category === '사찰') {
     return '잠깐의 쉼과 회복을 위한 공간이에요.';
   }
   return '한적하고 편안하게 머무르기 좋은 곳이에요.';
 }
 
 function getExcludedNames() {
-  return new Set(recentRecommendations.value.map((item) => item.name));
+  return new Set(recentRecommendations.value.map((item) => getItemName(item)));
 }
 
 async function buildLocalReply(userText) {
   try {
-    const idxResp = await fetch('/data/quiet_index_lite.json');
+    const idxResp = await fetch('/data/quiet_places_seoul.json');
     const idxData = idxResp.ok ? await idxResp.json() : null;
-
     const items = Array.isArray(idxData?.items) ? idxData.items : [];
-    if (!items.length) {
-      return '현재 추천 데이터를 불러올 수 없습니다.';
-    }
+    if (!items.length) return '현재 추천 데이터를 불러올 수 없습니다.';
 
     const mood = detectMood(userText);
     const intent = detectIntent(userText);
+    const categoryTargets = normalizeCategoryKeyword(intent.category || '');
     const excludedNames = getExcludedNames();
 
-    let candidates = items
-      .slice()
-      .filter((item) => !excludedNames.has(item.name))
-      .sort((a, b) => (b.q ?? 0) - (a.q ?? 0));
+    const baseCandidates = items
+      .filter((item) => !excludedNames.has(getItemName(item)));
 
-    if (intent.category) {
-      candidates = candidates.filter((item) => {
-        const cat = (item.cat || '').toLowerCase();
-        const name = (item.name || '').toLowerCase();
-        return cat.includes(intent.category.toLowerCase()) || name.includes(intent.category.toLowerCase());
-      });
+    const scored = baseCandidates.map((item) => {
+      const quiet = getItemQuietLevel(item);
+      const cat = (getItemCategory(item) || '').toLowerCase();
+      const name = (getItemName(item) || '').toLowerCase();
+
+      let score = quiet;
+
+      if (categoryTargets.length) {
+        const matched = categoryTargets.some((target) =>
+          cat.includes(target.toLowerCase()) || name.includes(target.toLowerCase())
+        );
+        if (matched) score += 12; 
+        else score -= 4;
+      } else {
+        
+        if (mood.vibe === 'recharge') {
+          if (/(공원|자연|사찰|절|둘레길|숲길|카페)/.test(cat)) score += 4;
+          if (/(도서관)/.test(cat)) score -= 2; 
+        } else if (mood.vibe === 'romantic') {
+          if (/(미술관|갤러리|박물관|공원|자연|카페)/.test(cat)) score += 4;
+          if (/(도서관)/.test(cat)) score -= 2;
+        } else if (mood.vibe === 'focus') {
+          if (/(도서관|카페)/.test(cat)) score += 4;
+        }
+      }
+
+      if (intent.wantsMoreQuiet) score += 2;
+
+      return { item, score };
+    });
+
+    const sortedEntries = scored.sort((a, b) => b.score - a.score);
+
+    const picked = [];
+    const seenCategories = new Set();
+
+    
+    if (!intent.category) {
+      for (const entry of sortedEntries) {
+        const rawCat = getItemCategory(entry.item) || '';
+        let matchedGroup = '기타';
+        if (/공원|자연|숲|둘레길/.test(rawCat)) matchedGroup = '공원';
+        else if (/미술|갤러리|박물관|전시|문화/.test(rawCat)) matchedGroup = '미술관';
+        else if (/도서관|책|독서/.test(rawCat)) matchedGroup = '도서관';
+        else if (/카페|커피/.test(rawCat)) matchedGroup = '카페';
+        else if (/사찰|절/.test(rawCat)) matchedGroup = '사찰';
+
+        if (!seenCategories.has(matchedGroup)) {
+          picked.push(entry.item);
+          seenCategories.add(matchedGroup);
+        }
+        if (picked.length === 3) break;
+      }
     }
 
-    if (intent.wantsDifferent && candidates.length < 3) {
-      candidates = items
-        .slice()
-        .filter((item) => !excludedNames.has(item.name))
-        .sort((a, b) => (b.q ?? 0) - (a.q ?? 0));
-    }
-
-    if (intent.wantsMoreQuiet) {
-      candidates = candidates.sort((a, b) => (b.q ?? 0) - (a.q ?? 0));
-    }
-
-    const picked = candidates.slice(0, 3);
-    if (!picked.length) {
-      const fallback = items.slice().sort((a, b) => (b.q ?? 0) - (a.q ?? 0)).slice(0, 3);
-      recentRecommendations.value = fallback;
-      const names = fallback.map((it) => `• **${it.name}** (${it.gu}·${it.cat})`).join('\n');
-      return `이런 곳들은 어떨까요?\n\n${names}`;
+    if (picked.length < 3) {
+      for (const entry of sortedEntries) {
+        if (!picked.some((p) => getItemName(p) === getItemName(entry.item))) {
+          picked.push(entry.item);
+        }
+        if (picked.length === 3) break;
+      }
     }
 
     recentRecommendations.value = picked;
 
     const descriptions = picked.map((it) => {
-      const cat = it.cat || '장소';
+      const cat = getItemCategory(it) || '장소';
       const gu = it.gu || '서울';
-      const quietLevel = it.q ?? 0;
-      const reason = getReasonText(it, mood, intent);
-      return `📍 **${it.name}**\n   [${gu} / ${cat}] ⭐조용함: ${quietLevel}/10\n   ${reason}`;
+      const quietLevel = getItemQuietLevel(it);
+      const reason = getReasonText(it, mood, { ...intent, category: intent.category });
+
+      return `📍 **${getItemName(it)}**\n   [${gu} / ${cat}] ⭐조용함: ${quietLevel}/10\n   ${reason}`;
     });
 
-    const style = getReplyStyle(mood, intent);
-    let reply = `💡 ${style} ${mood.label} 분위기의 공간을 골라봤어요.\n\n`;
-
-    if (intent.wantsDifferent) {
-      reply = `💡 다른 방향으로 골라봤어요. ${style} 분위기의 곳을 위주로 정리해봤어요.\n\n`;
-    } else if (intent.wantsNearby) {
-      reply = `💡 가까운 곳 위주로 찾았어요. ${style} 느낌의 공간을 추천해볼게요.\n\n`;
-    } else if (intent.wantsMoreQuiet) {
-      reply = `💡 더 한적한 곳을 찾고 싶으신 거라면, 이런 곳들이 잘 어울려요.\n\n`;
-    }
-
-    reply += descriptions.join('\n\n');
-    return reply;
+    return `💡 ${getReplyStyle(mood, { ...intent, category: intent.category })} 분위기의 공간을 골라봤어요.\n\n${descriptions.join('\n\n')}`;
   } catch (err) {
     console.warn('로컬 추천 생성 실패:', err);
     return '현재 추천 기능을 이용할 수 없습니다.';
@@ -261,50 +365,7 @@ async function buildLocalReply(userText) {
 }
 
 async function callOpenAI(userText, recentMessages = []) {
-  const localReply = await buildLocalReply(userText);
-
-  try {
-    const key = import.meta.env.VITE_OPENAI_API_KEY;
-    if (!key) return localReply;
-
-    const systemMsg = {
-      role: 'system',
-      content:
-        '너는 서울의 조용한 장소를 추천하는 도우미야. 설명은 군더더기 없이 아주 짧고 직관적으로 답해줘.\n\n' +
-        '[답변 작성 규칙]\n' +
-        '1. 인삿말이나 도입부는 한 줄 이내로 최소화한다.\n' +
-        '2. 장소 이름은 반드시 **장소이름** 형식(굵은 글씨)으로 작성한다.\n' +
-        '3. 장소마다 1) 이름 2) 구/카테고리 정보 3) 추천 이유를 각각 한 줄씩 줄바꿈하여 간결하게 나열한다.\n' +
-        '4. 전체 답변의 총 길이는 6줄 이내로 극도로 짧고 직관적이어야 한다.'
-    };
-
-    const messagesPayload = [
-      systemMsg,
-      ...recentMessages.slice(-6),
-      { role: 'user', content: userText },
-    ];
-
-    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${key}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: messagesPayload,
-      }),
-    });
-
-    if (!resp.ok) throw new Error(`OpenAI error: ${resp.status}`);
-
-    const data = await resp.json();
-    const content = data?.choices?.[0]?.message?.content?.trim();
-    return content || localReply;
-  } catch (err) {
-    console.warn('OpenAI 호출 실패, 로컬 추천으로 대체합니다:', err);
-    return localReply;
-  }
+  return buildLocalReply(userText);
 }
 
 function onKeydown(e) {
@@ -324,8 +385,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
   box-sizing: border-box;
   font-family: inherit;
 }
-
-/* Floating action button */
 .fab {
   width: 56px;
   height: 56px;
@@ -344,8 +403,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
 .fab:active {
   transform: scale(0.96);
 }
-
-/* Panel */
 .panel {
   position: absolute;
   right: 0;
@@ -361,8 +418,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
   border: 1px solid rgba(160, 219, 242, 0.12);
   backdrop-filter: blur(6px);
 }
-
-/* Header */
 .panel-header {
   background: #4F46E5;
   color: #fff;
@@ -374,8 +429,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
   justify-content: center;
   align-items: center;
 }
-
-/* Messages area */
 .messages {
   padding: 12px;
   flex: 1 1 auto;
@@ -385,8 +438,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
   flex-direction: column;
   gap: 8px;
 }
-
-/* message layout */
 .message {
   display: flex;
   width: 100%;
@@ -397,8 +448,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
 .message.user {
   justify-content: flex-end;
 }
-
-/* bubble */
 .bubble {
   max-width: 78%;
   padding: 10px 12px;
@@ -418,15 +467,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
   color: #fff;
   border-bottom-right-radius: 6px;
 }
-
-/* loading bubble */
 .loading-bubble {
   opacity: 0.9;
   font-weight: 600;
   letter-spacing: 2px;
 }
-
-/* Composer */
 .composer {
   display: flex;
   gap: 8px;
@@ -458,8 +503,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
   opacity: 0.6;
   cursor: not-allowed;
 }
-
-/* Transition */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.18s ease, transform 0.18s ease;
@@ -469,8 +512,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
   opacity: 0;
   transform: translateY(6px) scale(0.995);
 }
-
-/* 모바일 대응 */
 @media (max-width: 480px) {
   .fab {
     width: 52px;
