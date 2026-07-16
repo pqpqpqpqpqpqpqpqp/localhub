@@ -206,7 +206,7 @@ function openPlace(p) {
     border: none;
     padding: 0;
     text-align: left;
-    color: #0f172a;
+    color: #475569;
     cursor: pointer;
     font-weight: 700;
     display: inline-flex;
@@ -239,6 +239,7 @@ function openPlace(p) {
 .small {
     padding: 0.45rem 0.7rem;
     border-radius: 8px;
+    color: #475569;
     background: #f8fafc;
     border: 1px solid #eef2ff;
     cursor: pointer;
@@ -248,6 +249,7 @@ function openPlace(p) {
 .small.ghost {
     background: transparent;
     border: 1px solid #e6eefb;
+    color: #475569;
 }
 
 /* 반응형 조정 */
