@@ -3,11 +3,6 @@
  * - 장소 카테고리별 기본 점수 부여
  * - 사용자 리뷰 개수 등을 조합해 '조용함 점수' 산출
  */
-/**
- * [비즈니스 로직] 조용함 지수 계산 알고리즘
- * - 장소 카테고리별 기본 점수 부여
- * - 사용자 리뷰 개수 등을 조합해 '조용함 점수' 산출
- */
 export function computeQuiet(place, postsForPlace = []) {
   const base = typeof place.baseQuiet === 'number'
     ? place.baseQuiet

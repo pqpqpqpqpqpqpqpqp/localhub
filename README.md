@@ -6,12 +6,10 @@
 ---
 
 ## 🚀 프로젝트 상태
-- **진행도**: 95% (UI, 지도, 게시판, 챗봇 기능 구현 완료)
-- **마감 기한**: 2026-07-16
+- **진행도**: 100% (기능 구현 및 최종 검토 완료)  
+- **마감 기한**: 2026-07-16  
 - **남은 작업**: 
-  - Netlify 배포 확인
-  - OpenAI API 키 환경변수 설정 (선택 사항)
-
+  - 없음
 ---
 
 ## ✨ 핵심 기능
@@ -48,16 +46,21 @@ src/
 ├── layouts/
 │   └── DefaultLayout.vue      # 기본 레이아웃
 ├── views/
-│   └── HomeView.vue           # 메인 페이지
+│   ├── HomeView.vue           # 메인 페이지
+│   ├── MapView.vue            # 지도 페이지
+│   ├── BoardListView.vue      # 게시판 목록
+│   ├── BoardDetailView.vue    # 게시글 상세
+│   └── PostFormView.vue       # 게시글 작성/수정
 ├── components/
 │   ├── ChatBot.vue            # 챗봇 컴포넌트
 │   └── QuietMap.vue           # 지도 시각화 컴포넌트
 └── composables/
     ├── usePosts.js            # 게시판 비즈니스 로직
+    ├── usePlaces.js           # 장소 로드/관리 로직
     └── useQuietScore.js       # 조용함 지수 산출 로직
 public/data/
-├── quiet_places_seoul.json # 서울시 장소 원본 데이터
-└── quiet_index_lite.json  # 조용함 지수 가공 데이터
+├── quiet_places_seoul.json # 서울시 조용한 장소 데이터
+└── quiet_index_lite.json  # 위 데이터의 경량화 버전
 ```
 
 ---
