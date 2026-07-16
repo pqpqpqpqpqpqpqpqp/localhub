@@ -216,7 +216,7 @@ function openPlace(p) {
 
 /* 조용함 태그 강조 */
 .quiet {
-    color: #0ea5a4;
+    color: var(--quiet-very);
     font-weight: 700;
     font-size: 0.95rem;
 }

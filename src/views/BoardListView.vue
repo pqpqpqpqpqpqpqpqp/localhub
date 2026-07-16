@@ -21,7 +21,7 @@
                     </div>
 
                     <div class="actions">
-                        <button class="btn-icon" title="수정" @click="goEdit(p.id)">📝</button>
+                        <button class="btn-icon" title="수정" @click="goEdit(p.id)">📝 수정</button>
                         <button :class="['btn-like', { active: isLiked(p.id) }]" @click="onToggleLike(p.id)">
                             {{ isLiked(p.id) ? '❤️ 추천됨' : '🤍 추천' }}
                         </button>
@@ -159,6 +159,11 @@ button {
     border-color: #ffe4e6;
 }
 
+.btn-like:hover {
+    background: #e11d48;
+    color: white;
+}
+
 .btn-like.active {
     background: #e11d48;
     color: white;
@@ -177,7 +182,13 @@ button {
 
 .btn-icon {
     background: #f1f5f9;
-    font-size: 1.1rem;
+    color: #475569;
+    border-color: #e2e8f0;
+}
+
+.btn-icon:hover {
+    background: #475569;
+    color: white;
 }
 
 .empty {

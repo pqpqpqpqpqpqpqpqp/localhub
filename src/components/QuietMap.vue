@@ -10,10 +10,10 @@
       <!-- 조용함 지수 범례 -->
       <div class="legend">
         <div class="legend-title">조용함 지수</div>
-        <div class="legend-item"><span class="dot" style="background:#0B6E6E"></span>아주 조용 (4.5+)</div>
-        <div class="legend-item"><span class="dot" style="background:#3AA6A6"></span>조용 (3.5+)</div>
-        <div class="legend-item"><span class="dot" style="background:#8FB8B8"></span>보통 (2.5+)</div>
-        <div class="legend-item"><span class="dot" style="background:#B0B0B0"></span>시끄러움</div>
+        <div class="legend-item"><span class="dot very" style="background:var(--quiet-very)"></span>아주 조용 (4.5+)</div>
+        <div class="legend-item"><span class="dot high" style="background:var(--quiet-high)"></span>조용 (3.5+)</div>
+        <div class="legend-item"><span class="dot mid" style="background:var(--quiet-mid)"></span>보통 (2.5+)</div>
+        <div class="legend-item"><span class="dot low" style="background:var(--quiet-low)"></span>시끄러움</div>
       </div>
 
       <!-- 필터 패널 -->

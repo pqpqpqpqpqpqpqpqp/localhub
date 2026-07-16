@@ -10,6 +10,14 @@
   --color-success: #0B6E6E;
   --color-accent: #0ea5a4;
 
+  --quiet-very: #0B6E6E; /* 아주 조용 */
+  --quiet-high: #3AA6A6; /* 조용 */
+  --quiet-mid:  #8FB8B8; /* 보통 */
+  --quiet-low:  #B0B0B0; /* 시끄러움 */
+
+  --color-success: var(--quiet-very);
+  --color-accent: #0ea5a4;
+
   /* 그림자 */
   --shadow-sm: 0 2px 8px rgba(2,6,23,0.04);
   --shadow-md: 0 10px 30px rgba(0,0,0,0.06);
