@@ -1,11 +1,6 @@
 <template>
   <div class="chatbot" :class="{ open: isOpen }">
-    <button
-      class="fab"
-      @click="toggle"
-      :aria-expanded="isOpen"
-      :aria-label="isOpen ? '채팅 닫기' : '채팅 열기'"
-    >
+    <button class="fab" @click="toggle" :aria-expanded="isOpen" :aria-label="isOpen ? '채팅 닫기' : '채팅 열기'">
       <span v-if="!isOpen">💬</span>
       <span v-else>✕</span>
     </button>
@@ -17,11 +12,7 @@
         </header>
 
         <div class="messages" ref="messagesRef" role="log" aria-live="polite">
-          <div
-            v-for="(m, idx) in messages"
-            :key="idx"
-            :class="['message', m.role]"
-          >
+          <div v-for="(m, idx) in messages" :key="idx" :class="['message', m.role]">
             <div class="bubble">{{ m.content }}</div>
           </div>
 
@@ -31,14 +22,8 @@
         </div>
 
         <form class="composer" @submit.prevent="send">
-          <input
-            v-model="input"
-            class="input"
-            type="text"
-            placeholder="메시지를 입력해 주세요."
-            aria-label="메시지 입력"
-            @keydown.enter.prevent="send"
-          />
+          <input v-model="input" class="input" type="text" placeholder="메시지를 입력해 주세요." aria-label="메시지 입력"
+            @keydown.enter.prevent="send" />
           <button class="send-btn" type="submit" :disabled="loading" aria-label="전송">
             전송
           </button>
@@ -49,334 +34,252 @@
 </template>
 
 <script setup>
-import { ref, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import { ref, onMounted, nextTick } from 'vue';
 
+// 챗봇 UI 상태 변수
 const isOpen = ref(false);
-const CHAT_HISTORY_KEY = 'chatbot-history';
+const input = ref('');
+const loading = ref(false);
+const messagesRef = ref(null);
 
 const messages = ref([
   {
     role: 'assistant',
-    content: '안녕하세요! 당신의 기분에 맞는 서울의 조용한 곳을 추천해 드릴게요. 어떤 장소를 추천받고 싶으신가요?',
-  },
+    content: '안녕하세요! 서울의 조용한 쉼터를 추천하는 무음 도우미입니다. 어느 자치구나 어떤 종류(예: 카페, 도서관, 공원)의 장소를 찾으시는지 편하게 질문해 주세요.'
+  }
 ]);
 
-const input = ref('');
-const loading = ref(false);
-const messagesRef = ref(null);
-const recentRecommendations = ref([]);
+// 로컬 데이터 저장용 변수
+const places = ref([]);
 
-
-function isValidInput(text) {
-  const t = text.trim();
-  
-
-  if (t.length <= 1) return false;
-
-  
-  if (/(\w|\D)\1\1+/.test(t)) {
-    return false;
-  }
- 
-  if (/^[ㄱ-ㅎㅏ-ㅣ\s]+$/.test(t)) {
-    return false;
-  }
-
-  const badWords = ['바보', '멍청이', '쓰레기', '시발', '지랄', '개새끼', '존나', '엿'];
-  const hasBadWord = badWords.some(word => t.includes(word));
-  if (hasBadWord) return false;
-
-  return true;
-}
-
-function toggle() {
-  isOpen.value = !isOpen.value;
-  if (isOpen.value) nextTick(() => scrollToBottom());
-}
-
-async function scrollToBottom() {
-  await nextTick();
-  const el = messagesRef.value;
-  if (el) el.scrollTop = el.scrollHeight;
-}
-
-function addMessage(role, content) {
-  messages.value.push({ role, content });
-  localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(messages.value));
-  scrollToBottom();
-}
-
-async function send() {
-  const text = (input.value || '').trim();
-  if (!text || loading.value) return;
-
-
-  addMessage('user', text);
-  input.value = '';
-
-  
-  if (!isValidInput(text)) {
-    loading.value = true;
-    setTimeout(() => {
-      addMessage('assistant', '적절치 않은 단어입니다. 다시 입력해 주세요.');
-      loading.value = false;
-    }, 600);
-    return; 
-  }
-
-  loading.value = true;
-
+// 컴포넌트 마운트 시 JSON 데이터 로드 및 병합
+onMounted(async () => {
   try {
-    const reply = await callOpenAI(text, messages.value.slice(-6));
-    addMessage('assistant', reply);
-  } catch {
-    addMessage('assistant', '죄송해요. 응답을 가져오는 데 실패했어요.');
+    const [placesRes, indexRes] = await Promise.all([
+      fetch('/data/quiet_places_seoul.json').then(r => r.ok ? r.json() : { items: [] }),
+      fetch('/data/quiet_index_lite.json').then(r => r.ok ? r.json() : { items: [] })
+    ]);
+
+    const rawPlaces = placesRes.items || [];
+    const rawIndices = indexRes.items || [];
+
+    // quiet_index_lite.json의 정숙도 평점(q)을 매핑하기 위한 Map 생성
+    const indexMap = new Map();
+    rawIndices.forEach(item => {
+      if (item.id) {
+        indexMap.set(String(item.id), item);
+      }
+    });
+
+    // 두 데이터 병합하여 places에 저장
+    places.value = rawPlaces.map(place => {
+      const matchedIndex = indexMap.get(String(place.contentid));
+      return {
+        ...place,
+        finalQuiet: matchedIndex ? matchedIndex.q : place.baseQuiet || 3
+      };
+    });
+  } catch (error) {
+    console.error('데이터 로드 실패:', error);
+  }
+});
+
+// 스크롤 하단 이동 함수
+const scrollToBottom = async () => {
+  await nextTick();
+  if (messagesRef.value) {
+    messagesRef.value.scrollTop = messagesRef.value.scrollHeight;
+  }
+};
+
+// 창 토글
+const toggle = () => {
+  isOpen.value = !isOpen.value;
+  if (isOpen.value) {
+    scrollToBottom();
+  }
+};
+
+const findRelevantPlaces = (query) => {
+  if (!places.value.length) return [];
+
+  const cleanQuery = query.trim().toLowerCase();
+  if (!cleanQuery) return [];
+
+  let matched = [];
+
+  // 1. 특정 자치구 검색 대응 (예: '강남', '종로구' 등)
+  const guList = ["강남구", "강동구", "강북구", "강서구", "관악구", "광진구", "구로구", "금천구", "노원구", "도봉구", "동대문구", "동작구", "마포구", "서대문구", "서초구", "성동구", "성북구", "송파구", "양천구", "영등포구", "용산구", "은평구", "종로구", "중구", "중랑구"];
+  let targetedGu = null;
+  for (const gu of guList) {
+    if (cleanQuery.includes(gu) || cleanQuery.includes(gu.replace('구', ''))) {
+      targetedGu = gu;
+      break;
+    }
+  }
+
+  // 2. 카테고리 유연 매핑 키워드 대응
+  let targetedCat = null;
+  const catMap = {
+    "도서관": "도서관",
+    "책": "도서관",
+    "북": "도서관",
+    "숲": "둘레길/숲길",
+    "길": "둘레길/숲길",
+    "산": "둘레길/숲길",
+    "둘레길": "둘레길/숲길",
+    "사찰": "사찰",
+    "절": "사찰",
+    "미술관": "미술관/갤러리",
+    "갤러리": "미술관/갤러리",
+    "전시": "미술관/갤러리",
+    "박물관": "박물관",
+    "공원": "공원/자연",
+    "호수": "호수/근린공원"
+  };
+  for (const [key, cat] of Object.entries(catMap)) {
+    if (cleanQuery.includes(key)) {
+      targetedCat = cat;
+      break;
+    }
+  }
+
+  // 3. 자치구 및 카테고리에 기반한 1차 검색 실행
+  matched = places.value.filter(place => {
+    const isGuMatch = targetedGu ? place.gu === targetedGu : true;
+    const isCatMatch = targetedCat ? place.catName === targetedCat : true;
+    return isGuMatch && isCatMatch;
+  });
+
+  // 4. 자치구/카테고리 매칭 결과가 비어있거나 구체적 대상이 안 잡힌 경우, 텍스트 키워드 부분 매칭 시도
+  if (matched.length === 0 || (!targetedGu && !targetedCat)) {
+    const stopWords = ["추천", "추천해", "추천해줘", "조용한", "조용", "시원한", "시원", "어디", "공간", "장소", "카페"];
+    const keywords = cleanQuery.split(/\s+/).filter(w => w.length > 1 && !stopWords.includes(w));
+
+    if (keywords.length > 0) {
+      matched = places.value.filter(place => {
+        const searchText = [
+          place.title,
+          place.addr1,
+          place.catName,
+          place.gu
+        ].filter(Boolean).join(' ').toLowerCase();
+
+        return keywords.some(kw => searchText.includes(kw));
+      });
+    }
+  }
+
+  // [개선] 매칭 결과가 없을 경우, 억지 장소 매칭을 방지하기 위해 빈 배열([])을 그대로 반환합니다.
+  return matched
+    .sort((a, b) => (b.finalQuiet || 0) - (a.finalQuiet || 0))
+    .slice(0, 10);
+};
+
+// [수정] OpenAI API 키가 없을 때 동작할 로컬 단순 추천 로직
+const getLocalFallbackReply = (query, matched) => {
+  if (matched.length === 0) {
+    return `죄송하지만 말씀하신 '${query}' 키워드로는 관련 장소를 찾지 못했거나 질문을 이해하기 어렵습니다.\n\n원하시는 자치구(예: 마포구, 종로구 등)나 장소 유형(예: 도서관, 공원, 사찰 등)을 구체적으로 포함하여 다시 질문해 주시면 감사하겠습니다.`;
+  }
+
+  let reply = `[알림] 현재 OpenAI API 키가 설정되지 않아 데이터베이스 내 매칭 결과를 출력합니다.\n\n요청하신 키워드 관련 추천 장소 리스트입니다:\n\n`;
+  matched.forEach((p, idx) => {
+    reply += `${idx + 1}. **${p.title}**\n`;
+    reply += `📍 주소: ${p.addr1 || '주소 정보 없음'} (${p.gu || ''})\n`;
+    reply += `🤫 조용함 지수: ${p.finalQuiet || '정보 없음'}\n\n`;
+  });
+  return reply;
+};
+
+// [수정] 메시지 전송 로직
+const send = async () => {
+  const userText = input.value.trim();
+  if (!userText || loading.value) return;
+
+  // 1. 사용자 메시지 추가
+  messages.value.push({ role: 'user', content: userText });
+  input.value = '';
+  loading.value = true;
+  scrollToBottom();
+
+  // 2. 키워드 및 카테고리 기반 로컬 데이터 필터링
+  const matchedPlaces = findRelevantPlaces(userText);
+  const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+
+  // API 키가 존재하지 않으면 로컬 추천 폴백 실행
+  if (!apiKey) {
+    setTimeout(() => {
+      const fallbackReply = getLocalFallbackReply(userText, matchedPlaces);
+      messages.value.push({ role: 'assistant', content: fallbackReply });
+      loading.value = false;
+      scrollToBottom();
+    }, 800);
+    return;
+  }
+
+  // 3. OpenAI API 호출
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `당신은 서울의 조용한 장소들을 안내하는 AI 비서 '무음 도우미'입니다.
+
+[중요 응대 원칙]
+1. 일상적인 인사나 가벼운 대화(예: "안녕", "오늘 기분 어때", "심심해" 등)에는 거부하지 말고 친절하고 다정하게 대답해 주십시오.
+   - 단, 일상적인 대답 끝에는 자연스럽게 "서울의 조용하고 편안한 쉼터를 찾고 계신가요? 원하는 자치구나 장소 유형이 있다면 언제든 말씀해 주세요!"와 같이 서비스 본연의 목적으로 복귀하도록 유도하는 멘트를 포함해 주세요.
+2. 거부 및 재질문 대상 (엄격히 제한):
+   - 사용자가 의미 없는 자음/모음의 나열(예: "ㄴㅇㄹㄴㅇㄹ", "ㄱㄷㄱㄷ"), 낙서성 도배글, 혹은 이 서비스와 전혀 무관하고 답변하기 곤란한 기술적 요청(예: "프로그래밍 코드를 짜줘", "수학 문제를 풀어줘" 등)을 하는 경우에만 장소 추천을 포기하고 아래 예시처럼 되물어 주십시오.
+   - 예시: "죄송하지만 질문을 이해하기 어렵습니다. 원하시는 자치구(예: 마포구, 종로구 등)나 찾으시는 장소 종류(예: 도서관, 사찰, 공원 등)를 함께 적어 다시 한 번 질문해 주시겠어요?"
+3. 덜 조용한 곳이나 비교적 야외 활동적인 공간을 원할 때:
+   - 제공된 데이터 중 조용함 지수가 비교적 낮은 곳(예: 조용함 지수 3인 한강공원이나 야외 공원 등)을 매칭하여 센스 있게 추천해 주십시오.
+4. 장소 추천 시 공통 포맷:
+   - 추천 장소는 최대 3개까지만 제한하여 알려주세요.
+   - 장소명, 주소, 카테고리, 조용함 지수(finalQuiet, 5점 만점)를 줄바꿈을 활용해 일목요연하게 표시하되, 이미지 마크다운(![텍스트](url))은 절대로 포함하지 마십시오.`
+          },
+          {
+            role: 'user',
+            content: `[참고 가능한 서울 조용한 장소 데이터]
+${JSON.stringify(matchedPlaces, null, 2)}
+
+[사용자의 질문]
+${userText}`
+          }
+        ],
+        temperature: 0.3 // 답변의 일관성을 높이기 위해 수치를 조금 더 내림
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API Error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const reply = data.choices?.[0]?.message?.content || '죄송합니다. 답변을 생성하는 중에 문제가 발생했습니다.';
+
+    messages.value.push({ role: 'assistant', content: reply });
+  } catch (error) {
+    console.error('API 호출 중 문제 발생:', error);
+    messages.value.push({
+      role: 'assistant',
+      content: '죄송합니다. 서버 통신 중 오류가 발생하여 현재 답변을 드리기 어렵습니다. 잠시 후 다시 시도해 주세요.'
+    });
   } finally {
     loading.value = false;
+    scrollToBottom();
   }
-}
-
-function detectMood(text) {
-  const t = text.toLowerCase();
-
-  if (/(피곤|지침|힘들|우울|슬퍼|스트레스|불안|예민|짜증|긴장|지쳐|피로|퇴근)/.test(t)) {
-    return { label: '차분하고 조용한', tone: '부드럽고 안정감 있는', vibe: 'recharge' };
-  }
-  if (/(혼자|휴식|쉼|조용|집중|공부|독서|명상|힐링|정리|생각|마음)/.test(t)) {
-    return { label: '조용하고 편안한', tone: '잔잔하고 편안한', vibe: 'focus' };
-  }
-  if (/(감성|데이트|산책|사진|분위기|연인|사랑|여행|감상)/.test(t)) {
-    return { label: '감성적인', tone: '감성적이고 아늑한', vibe: 'romantic' };
-  }
-
-  return { label: '편안한', tone: '편안하고 산뜻한', vibe: 'comfort' };
-}
-
-function detectIntent(text) {
-  const t = text.toLowerCase();
-  const intent = {
-    wantsDifferent: /(다른|다른 곳|다른 장소|다른 추천|다른 거|다시|다음)/.test(t),
-    wantsNearby: /(근처|주변|가까운|가깝게|우리 동네|내 근처)/.test(t),
-    wantsMoreQuiet: /(더 조용|조용한 곳|조용하게|조용히|한적한|한산)/.test(t),
-    wantsRelax: /(휴식|힐링|쉼|명상|감정|정리|편안|relax)/.test(t),
-    category: null,
-  };
-
-  if (/(도서관|책|독서|공부|학습|스터디)/.test(t)) {
-    intent.category = '도서관';
-  } else if (/(공원|산책|자연|한강|나무|풀|숲|둘레길|러닝)/.test(t)) {
-    intent.category = '공원';
-  } else if (/(카페|커피|음료|디저트|차)/.test(t)) {
-    intent.category = '카페';
-  } else if (/(박물관|미술|전시|문화|예술|전시회|갤러리|미술관)/.test(t)) {
-    intent.category = '문화';
-  } else if (/(사찰|절)/.test(t)) {
-    intent.category = '사찰';
-  } else if (/(휴식|힐링|쉼|명상|감정|정리|마음|재충전)/.test(t)) {
-    intent.category = '휴식';
-  }
-
-  return intent;
-}
-
-function normalizeCategoryKeyword(keyword) {
-  const k = (keyword || '').toLowerCase();
-
-  if (/(사찰|절|명상|휴식|힐링|쉼|재충전)/.test(k)) {
-    return ['사찰'];
-  }
-  if (/(공원|산책|자연|한강|나무|풀|숲|둘레길|러닝)/.test(k)) {
-    return ['공원/자연', '호수/근린공원', '둘레길/숲길', '공원'];
-  }
-  if (/(미술관|갤러리|전시|예술|문화|전시회|미술)/.test(k)) {
-    return ['미술관/갤러리', '박물관', '미술관', '문화'];
-  }
-  if (/(박물관|역사)/.test(k)) {
-    return ['박물관'];
-  }
-  if (/(도서관|책|독서|공부|학습|스터디)/.test(k)) {
-    return ['도서관'];
-  }
-  if (/(카페|커피|음료|디저트|차)/.test(k)) {
-    return ['카페'];
-  }
-
-  return [];
-}
-
-function matchesCategory(item, categoryTargets) {
-  const cat = (getItemCategory(item) || '').toLowerCase();
-  const name = (getItemName(item) || '').toLowerCase();
-
-  return categoryTargets.some((target) => {
-    const t = target.toLowerCase();
-    return cat.includes(t) || name.includes(t);
-  });
-}
-
-function getItemName(item) {
-  return item.title || item.name || '장소';
-}
-
-function getItemCategory(item) {
-  return item.catName || item.cat || '장소';
-}
-
-function getItemQuietLevel(item) {
-  return item.baseQuiet ?? item.q ?? 0;
-}
-
-function getReplyStyle(mood, intent) {
-  if (mood.vibe === 'recharge') return '피로를 풀 수 있는';
-  if (mood.vibe === 'focus') return '집중에 도움이 되는';
-  if (mood.vibe === 'romantic') return '분위기 있게 즐길 수 있는';
-  if (intent?.wantsMoreQuiet) return '더 한적한';
-  if (intent?.category) return `${intent.category} 느낌의`;
-  return '편안한';
-}
-
-function getReasonText(item, mood, intent) {
-  if (mood.vibe === 'recharge') {
-    return '피곤한 마음을 달래 줄 수 있는 조용한 분위기예요.';
-  }
-  if (mood.vibe === 'focus') {
-    return '집중하기 좋고 차분한 분위기라 독서나 공부에 잘 어울려요.';
-  }
-  if (mood.vibe === 'romantic') {
-    return '감성적인 풍경과 잔잔한 분위기가 잘 어우러져요.';
-  }
-  if (intent?.category === '도서관') {
-    return '책과 조용한 분위기가 잘 어우러지는 곳이에요.';
-  }
-  if (intent?.category === '공원') {
-    return '자연을 느끼며 산책하기 좋은 공간이에요.';
-  }
-  if (intent?.category === '카페') {
-    return '커피와 함께 여유를 즐기기 좋은 곳이에요.';
-  }
-  if (intent?.category === '문화' || intent?.category === '박물관') {
-    return '아늑한 분위기 속에서 감상을 즐기기 좋아요.';
-  }
-  if (intent?.category === '휴식' || intent?.category === '사찰') {
-    return '잠깐의 쉼과 회복을 위한 공간이에요.';
-  }
-  return '한적하고 편안하게 머무르기 좋은 곳이에요.';
-}
-
-function getExcludedNames() {
-  return new Set(recentRecommendations.value.map((item) => getItemName(item)));
-}
-
-async function buildLocalReply(userText) {
-  try {
-    const idxResp = await fetch('/data/quiet_places_seoul.json');
-    const idxData = idxResp.ok ? await idxResp.json() : null;
-    const items = Array.isArray(idxData?.items) ? idxData.items : [];
-    if (!items.length) return '현재 추천 데이터를 불러올 수 없습니다.';
-
-    const mood = detectMood(userText);
-    const intent = detectIntent(userText);
-    const categoryTargets = normalizeCategoryKeyword(intent.category || '');
-    const excludedNames = getExcludedNames();
-
-    const baseCandidates = items
-      .filter((item) => !excludedNames.has(getItemName(item)));
-
-    const scored = baseCandidates.map((item) => {
-      const quiet = getItemQuietLevel(item);
-      const cat = (getItemCategory(item) || '').toLowerCase();
-      const name = (getItemName(item) || '').toLowerCase();
-
-      let score = quiet;
-
-      if (categoryTargets.length) {
-        const matched = categoryTargets.some((target) =>
-          cat.includes(target.toLowerCase()) || name.includes(target.toLowerCase())
-        );
-        if (matched) score += 12; 
-        else score -= 4;
-      } else {
-        
-        if (mood.vibe === 'recharge') {
-          if (/(공원|자연|사찰|절|둘레길|숲길|카페)/.test(cat)) score += 4;
-          if (/(도서관)/.test(cat)) score -= 2; 
-        } else if (mood.vibe === 'romantic') {
-          if (/(미술관|갤러리|박물관|공원|자연|카페)/.test(cat)) score += 4;
-          if (/(도서관)/.test(cat)) score -= 2;
-        } else if (mood.vibe === 'focus') {
-          if (/(도서관|카페)/.test(cat)) score += 4;
-        }
-      }
-
-      if (intent.wantsMoreQuiet) score += 2;
-
-      return { item, score };
-    });
-
-    const sortedEntries = scored.sort((a, b) => b.score - a.score);
-
-    const picked = [];
-    const seenCategories = new Set();
-
-    
-    if (!intent.category) {
-      for (const entry of sortedEntries) {
-        const rawCat = getItemCategory(entry.item) || '';
-        let matchedGroup = '기타';
-        if (/공원|자연|숲|둘레길/.test(rawCat)) matchedGroup = '공원';
-        else if (/미술|갤러리|박물관|전시|문화/.test(rawCat)) matchedGroup = '미술관';
-        else if (/도서관|책|독서/.test(rawCat)) matchedGroup = '도서관';
-        else if (/카페|커피/.test(rawCat)) matchedGroup = '카페';
-        else if (/사찰|절/.test(rawCat)) matchedGroup = '사찰';
-
-        if (!seenCategories.has(matchedGroup)) {
-          picked.push(entry.item);
-          seenCategories.add(matchedGroup);
-        }
-        if (picked.length === 3) break;
-      }
-    }
-
-    if (picked.length < 3) {
-      for (const entry of sortedEntries) {
-        if (!picked.some((p) => getItemName(p) === getItemName(entry.item))) {
-          picked.push(entry.item);
-        }
-        if (picked.length === 3) break;
-      }
-    }
-
-    recentRecommendations.value = picked;
-
-    const descriptions = picked.map((it) => {
-      const cat = getItemCategory(it) || '장소';
-      const gu = it.gu || '서울';
-      const quietLevel = getItemQuietLevel(it);
-      const reason = getReasonText(it, mood, { ...intent, category: intent.category });
-
-      return `📍 **${getItemName(it)}**\n   [${gu} / ${cat}] ⭐조용함: ${quietLevel}/10\n   ${reason}`;
-    });
-
-    return `💡 ${getReplyStyle(mood, { ...intent, category: intent.category })} 분위기의 공간을 골라봤어요.\n\n${descriptions.join('\n\n')}`;
-  } catch (err) {
-    console.warn('로컬 추천 생성 실패:', err);
-    return '현재 추천 기능을 이용할 수 없습니다.';
-  }
-}
-
-async function callOpenAI(userText, recentMessages = []) {
-  return buildLocalReply(userText);
-}
-
-function onKeydown(e) {
-  if (e.key === 'Escape' && isOpen.value) isOpen.value = false;
-}
-
-onMounted(() => window.addEventListener('keydown', onKeydown));
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
+};
 </script>
 
 <style scoped>
+/* 이전과 동일한 스타일 유지 */
 .chatbot {
   position: fixed;
   right: 20px;
@@ -385,6 +288,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
   box-sizing: border-box;
   font-family: inherit;
 }
+
 .fab {
   width: 56px;
   height: 56px;
@@ -400,9 +304,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
   box-shadow: 0 6px 18px rgba(160, 219, 242, 0.18);
   transition: transform 0.12s ease;
 }
+
 .fab:active {
   transform: scale(0.96);
 }
+
 .panel {
   position: absolute;
   right: 0;
@@ -414,10 +320,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.22), 0 6px 18px rgba(160,219,242,0.08);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.22), 0 6px 18px rgba(160, 219, 242, 0.08);
   border: 1px solid rgba(160, 219, 242, 0.12);
   backdrop-filter: blur(6px);
 }
+
 .panel-header {
   background: #4F46E5;
   color: #fff;
@@ -429,6 +336,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
   justify-content: center;
   align-items: center;
 }
+
 .messages {
   padding: 12px;
   flex: 1 1 auto;
@@ -438,16 +346,20 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
   flex-direction: column;
   gap: 8px;
 }
+
 .message {
   display: flex;
   width: 100%;
 }
+
 .message.assistant {
   justify-content: flex-start;
 }
+
 .message.user {
   justify-content: flex-end;
 }
+
 .bubble {
   max-width: 78%;
   padding: 10px 12px;
@@ -457,21 +369,25 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
   white-space: pre-line;
   box-shadow: 0 2px 8px rgba(160, 219, 242, 0.04);
 }
+
 .message.assistant .bubble {
   background: #E9EBEF;
   color: #033b3b;
   border-bottom-left-radius: 6px;
 }
+
 .message.user .bubble {
   background: #4F46E5;
   color: #fff;
   border-bottom-right-radius: 6px;
 }
+
 .loading-bubble {
   opacity: 0.9;
   font-weight: 600;
   letter-spacing: 2px;
 }
+
 .composer {
   display: flex;
   gap: 8px;
@@ -479,6 +395,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
   border-top: 1px solid rgba(160, 219, 242, 0.06);
   background: #fff;
 }
+
 .input {
   flex: 1 1 auto;
   padding: 8px 10px;
@@ -486,10 +403,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
   border-radius: 8px;
   outline: none;
 }
+
 .input:focus {
   box-shadow: 0 0 0 3px rgba(160, 219, 242, 0.06);
   border-color: #4F46E5;
 }
+
 .send-btn {
   background: #4F46E5;
   color: #fff;
@@ -499,25 +418,30 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
   cursor: pointer;
   font-weight: 600;
 }
+
 .send-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.18s ease, transform 0.18s ease;
 }
+
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
   transform: translateY(6px) scale(0.995);
 }
+
 @media (max-width: 480px) {
   .fab {
     width: 52px;
     height: 52px;
     font-size: 20px;
   }
+
   .panel {
     right: 12px;
     bottom: 70px;
