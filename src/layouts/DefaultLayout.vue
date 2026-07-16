@@ -16,6 +16,8 @@
       <slot />
     </main>
 
+    <ChatBot />
+
     <footer class="site-footer">
       <div class="container footer-inner">
         <small>LocalHub — Seoul · © { new Date().getFullYear() }</small>
@@ -24,7 +26,9 @@
   </div>
 </template>
 
-<script setup></script>
+<script setup>
+import ChatBot from '@/components/ChatBot.vue';
+</script>
 
 <style scoped>
 .site-root {

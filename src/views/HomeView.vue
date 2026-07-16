@@ -42,7 +42,6 @@
             </div>
         </section>
 
-        <ChatBot />
     </div>
 </template>
 
@@ -50,7 +49,6 @@
 import { computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import QuietMap from '@/components/QuietMap.vue';
-import ChatBot from '@/components/ChatBot.vue';
 import { useQuietPlaces } from '@/composables/usePlaces';
 import { usePosts } from '@/composables/usePosts';
 import { enrichPlaces } from '@/composables/useQuietScore';
