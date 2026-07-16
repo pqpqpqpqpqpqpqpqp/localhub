@@ -377,11 +377,11 @@ onBeforeUnmount(() => {
   padding: 8px 16px;
   border: none;
   border-radius: 20px;
-  background: #0b6e6e;
-  color: #fff;
+  background: var(--color-success);
+  color: var(--color-surface);
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.12);
 }
 
 .legend {
@@ -488,30 +488,35 @@ onBeforeUnmount(() => {
   align-items: center;
 }
 
+/* QuietMap: 필터 패널 가독성 개선 */
 .panel-header h3 {
   margin: 0;
   font-size: 16px;
-}
-
-.filter-section {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  color: var(--color-text);
+  font-weight: 700;
 }
 
 .section-title {
   font-size: 13px;
-  color: #555;
+  color: var(--color-text);
+  font-weight: 600;
 }
 
 .filter-section select {
-  width: 100%;
-  -webkit-appearance: auto;
-  appearance: auto;
-  cursor: pointer;
-  pointer-events: auto;
-  position: relative;
-  z-index: 1;
+  color: var(--color-text);
+}
+
+/* 버튼/칩 텍스트 색상 통일 */
+.level-btn,
+.chip,
+.chip .emoji {
+  color: var(--color-text);
+}
+
+/* 초기화 버튼 텍스트도 어둡게 */
+.panel-footer .reset {
+  background: #f5f5f5;
+  color: var(--color-text);
 }
 
 /* 조용함 등급 버튼 */

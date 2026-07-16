@@ -37,11 +37,11 @@ import ChatBot from '@/components/ChatBot.vue';
   min-height: 100vh;
   background-color: #f1f5f9;
   color: #1e293b;
-  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+  font-family: var(--font-stack);
 }
 
 .site-header {
-  background-color: #ffffff;
+  background-color: var(--color-surface);
   border-bottom: 1px solid #e2e8f0;
   position: sticky;
   top: 0;
@@ -65,7 +65,7 @@ import ChatBot from '@/components/ChatBot.vue';
 .brand {
   font-size: 1.5rem;
   font-weight: 800;
-  color: #4f46e5;
+  color: var(--color-primary);
   cursor: pointer;
   letter-spacing: -0.5px;
 }
@@ -78,29 +78,22 @@ import ChatBot from '@/components/ChatBot.vue';
 
 .nav-link {
   text-decoration: none;
-  color: #64748b;
+  color: var(--color-muted);
   font-weight: 500;
-  transition: color 0.2s;
+  transition: color 0.18s;
 }
-
 .nav-link:hover,
-.router-link-active {
-  color: #1e293b;
-}
-
+.router-link-active { color: var(--color-text); }
 .nav-cta {
-  background-color: #4f46e5;
-  color: #ffffff;
+  background-color: var(--color-primary);
+  color: var(--color-surface);
   padding: 8px 16px;
   border-radius: 8px;
   text-decoration: none;
   font-weight: 600;
-  transition: background 0.2s;
+  transition: background 0.18s;
 }
-
-.nav-cta:hover {
-  background-color: #4338ca;
-}
+.nav-cta:hover { background-color: var(--color-primary-600); }
 
 .main-content {
   flex: 1;

@@ -94,9 +94,7 @@ h1 {
     align-items: center;
     padding: 1.8rem 1.5rem;
     border: 1px solid #f1f5f9;
-    border-radius: 12px;
-    margin-bottom: 12px;
-    transition: all 0.2s ease;
+.title:hover { color: var(--color-primary); }
     background: #ffffff;
 }
 
