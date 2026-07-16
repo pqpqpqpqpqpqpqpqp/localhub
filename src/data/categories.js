@@ -8,13 +8,20 @@ export const CATEGORIES = [
   { code: 'VE030100', name: '공원/자연', baseQuiet: 3, emoji: '🌳' }
 ];
 
+export const QUIET_COLORS = {
+  very: '#0B6E6E',
+  high: '#3AA6A6',
+  mid:  '#8FB8B8',
+  low:  '#B0B0B0'
+};
+
 export function quietColor(score) {
   const s = Number(score);
-  if (Number.isNaN(s)) return '#B0B0B0';
-  if (s >= 4.5) return '#0B6E6E';
-  if (s >= 3.5) return '#3AA6A6';
-  if (s >= 2.5) return '#8FB8B8';
-  return '#B0B0B0';
+  if (Number.isNaN(s)) return QUIET_COLORS.low;
+  if (s >= 4.5) return QUIET_COLORS.very;
+  if (s >= 3.5) return QUIET_COLORS.high;
+  if (s >= 2.5) return QUIET_COLORS.mid;
+  return QUIET_COLORS.low;
 }
 
 export function quietLabel(score) {
