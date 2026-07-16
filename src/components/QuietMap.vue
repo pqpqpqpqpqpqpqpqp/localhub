@@ -1,79 +1,72 @@
 <template>
   <div class="quiet-map-wrap">
     <div id="quiet-map"></div>
+    <template v-if="!isHome">
+      <!-- 필터 열기/닫기 버튼 -->
+      <button class="filter-fab" @click="togglePanel" type="button">
+        {{ showFilter ? '✕ 닫기' : '☰ 필터' }}
+      </button>
 
-    <!-- 필터 열기/닫기 버튼 -->
-    <button class="filter-fab" @click="togglePanel" type="button">
-      {{ showFilter ? '✕ 닫기' : '☰ 필터' }}
-    </button>
-
-    <!-- 조용함 지수 범례 -->
-    <div class="legend">
-      <div class="legend-title">조용함 지수</div>
-      <div class="legend-item"><span class="dot" style="background:#0B6E6E"></span>아주 조용 (4.5+)</div>
-      <div class="legend-item"><span class="dot" style="background:#3AA6A6"></span>조용 (3.5+)</div>
-      <div class="legend-item"><span class="dot" style="background:#8FB8B8"></span>보통 (2.5+)</div>
-      <div class="legend-item"><span class="dot" style="background:#B0B0B0"></span>시끄러움</div>
-    </div>
-
-    <!-- 필터 패널 -->
-    <div class="filter-panel" :class="{ open: showFilter }" @click.self="onPanelBackgroundClick">
-      <div class="panel-inner" :class="{ mobile: isMobile }">
-        <header class="panel-header">
-          <h3>필터</h3>
-        </header>
-
-        <section class="filter-section">
-          <label class="section-title">카테고리</label>
-          <div class="chips">
-            <button
-              v-for="c in CATEGORIES"
-              :key="c.code"
-              :class="['chip', { active: selectedCategories.has(c.code) }]"
-              @click="toggleCategory(c.code)"
-              type="button"
-            >
-              <span class="emoji">{{ c.emoji }}</span>
-              <span class="name">{{ c.name }}</span>
-            </button>
-          </div>
-        </section>
-
-        <section class="filter-section">
-          <label class="section-title">자치구</label>
-          <select v-model="selectedGu">
-            <option value="">전체</option>
-            <option v-for="g in guOptions" :key="g" :value="g">{{ g }}</option>
-          </select>
-        </section>
-
-        <section class="filter-section">
-          <label class="section-title">조용함 정도</label>
-          <div class="quiet-levels">
-            <button
-              v-for="lv in QUIET_LEVELS"
-              :key="lv.value"
-              :class="['level-btn', { active: quietLevel === lv.value }]"
-              @click="quietLevel = lv.value"
-              type="button"
-            >
-              {{ lv.label }}
-            </button>
-          </div>
-        </section>
-
-        <footer class="panel-footer">
-          <button class="reset" @click="resetFilters" type="button">초기화</button>
-          <button class="apply" @click="applyFilters" type="button">적용</button>
-        </footer>
+      <!-- 조용함 지수 범례 -->
+      <div class="legend">
+        <div class="legend-title">조용함 지수</div>
+        <div class="legend-item"><span class="dot" style="background:#0B6E6E"></span>아주 조용 (4.5+)</div>
+        <div class="legend-item"><span class="dot" style="background:#3AA6A6"></span>조용 (3.5+)</div>
+        <div class="legend-item"><span class="dot" style="background:#8FB8B8"></span>보통 (2.5+)</div>
+        <div class="legend-item"><span class="dot" style="background:#B0B0B0"></span>시끄러움</div>
       </div>
-    </div>
+
+      <!-- 필터 패널 -->
+      <div class="filter-panel" :class="{ open: showFilter }" @click.self="onPanelBackgroundClick">
+        <div class="panel-inner" :class="{ mobile: isMobile }">
+          <header class="panel-header">
+            <h3>필터</h3>
+          </header>
+
+          <section class="filter-section">
+            <label class="section-title">카테고리</label>
+            <div class="chips">
+              <button v-for="c in CATEGORIES" :key="c.code"
+                :class="['chip', { active: selectedCategories.has(c.code) }]" @click="toggleCategory(c.code)"
+                type="button">
+                <span class="emoji">{{ c.emoji }}</span>
+                <span class="name">{{ c.name }}</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="filter-section">
+            <label class="section-title">자치구</label>
+            <select v-model="selectedGu">
+              <option value="">전체</option>
+              <option v-for="g in guOptions" :key="g" :value="g">{{ g }}</option>
+            </select>
+          </section>
+
+          <section class="filter-section">
+            <label class="section-title">조용함 정도</label>
+            <div class="quiet-levels">
+              <button v-for="lv in QUIET_LEVELS" :key="lv.value"
+                :class="['level-btn', { active: quietLevel === lv.value }]" @click="quietLevel = lv.value"
+                type="button">
+                {{ lv.label }}
+              </button>
+            </div>
+          </section>
+
+          <footer class="panel-footer">
+            <button class="reset" @click="resetFilters" type="button">초기화</button>
+            <button class="apply" @click="applyFilters" type="button">적용</button>
+          </footer>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
@@ -85,9 +78,19 @@ import { enrichPlaces } from '../composables/useQuietScore';
 import { quietColor, quietLabel, CATEGORIES } from '../data/categories';
 
 const router = useRouter();
+const route = useRoute();
+
+const props = defineProps({
+  isHome: {
+    type: Boolean,
+    default: false
+  }
+});
 
 let map = null;
 let clusterLayer = null;
+// contentid → marker 매핑 (홈에서 특정 장소로 이동할 때 사용)
+const markerByContentId = new Map();
 
 const { places, load: loadPlaces } = useQuietPlaces();
 const { list: listPosts } = usePosts();
@@ -188,6 +191,7 @@ function escapeHtml(str) {
 function renderMarkers() {
   if (!map || !clusterLayer) return;
   clusterLayer.clearLayers();
+  markerByContentId.clear();
 
   const markers = [];
   for (const place of filteredEnriched.value) {
@@ -230,8 +234,29 @@ function renderMarkers() {
       </div>
     `;
 
-    marker.bindPopup(popupHtml, { minWidth: 210 });
+    marker.bindPopup(popupHtml, { minWidth: 200, maxWidth: 200 });
     markers.push(marker);
+    if (place.contentid) markerByContentId.set(String(place.contentid), marker);
+  }
+  clusterLayer.addLayers(markers);
+}
+
+// 특정 장소로 이동하고 팝업 열기 (홈 화면에서 진입 시 사용)
+function focusPlace(contentid) {
+  if (!map || !clusterLayer || !contentid) return;
+  const marker = markerByContentId.get(String(contentid));
+  if (!marker) return;
+
+  // 클러스터에 묶여 있으면 펼친 뒤 팝업 열기
+  if (typeof clusterLayer.zoomToShowLayer === 'function') {
+    clusterLayer.zoomToShowLayer(marker, () => {
+      // 이동 애니메이션이 끝난 뒤 팝업이 닫히지 않도록 약간 지연
+      setTimeout(() => marker.openPopup(), 150);
+    });
+  } else {
+    const latlng = marker.getLatLng();
+    map.setView(latlng, 16);
+    setTimeout(() => marker.openPopup(), 300);
   }
   clusterLayer.addLayers(markers);
 }
@@ -277,7 +302,7 @@ onMounted(async () => {
   updateIsMobile();
   window.addEventListener('resize', updateIsMobile);
 
-  showFilter.value = !isMobile.value;
+  showFilter.value = false;
 
   await loadPlaces();
 
@@ -302,6 +327,17 @@ onMounted(async () => {
   watch(filteredEnriched, () => {
     renderMarkers();
   });
+
+  // 홈에서 특정 장소를 눌러 들어온 경우 해당 장소로 이동
+  if (!props.isHome && route.query.contentid) {
+    // 마커 렌더 직후 실행되도록 다음 틱에
+    setTimeout(() => focusPlace(route.query.contentid), 300);
+  }
+});
+
+// 지도 화면에 머문 상태로 query만 바뀌어도 반응 (예: 홈→지도 이후 다른 장소 선택)
+watch(() => route.query.contentid, (cid) => {
+  if (!props.isHome && cid) focusPlace(cid);
 });
 
 onBeforeUnmount(() => {
@@ -359,11 +395,13 @@ onBeforeUnmount(() => {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
   font-size: 12px;
 }
+
 .legend-title {
   font-weight: 700;
   margin-bottom: 6px;
   color: #333;
 }
+
 .legend-item {
   display: flex;
   align-items: center;
@@ -371,6 +409,7 @@ onBeforeUnmount(() => {
   margin: 2px 0;
   color: #555;
 }
+
 .legend .dot {
   width: 12px;
   height: 12px;
@@ -413,12 +452,14 @@ onBeforeUnmount(() => {
     right: auto;
     transform: translateX(-50%);
   }
+
   .legend {
     left: 8px;
     bottom: 80px;
     font-size: 11px;
     padding: 8px 10px;
   }
+
   .filter-panel {
     top: auto;
     bottom: 0;
@@ -479,6 +520,7 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   gap: 6px;
 }
+
 .level-btn {
   flex: 1 1 calc(50% - 6px);
   padding: 8px 6px;
@@ -489,6 +531,7 @@ onBeforeUnmount(() => {
   font-size: 13px;
   font-weight: 500;
 }
+
 .level-btn.active {
   background: #0b6e6e;
   color: #fff;
@@ -548,34 +591,76 @@ onBeforeUnmount(() => {
   color: #fff;
 }
 
-.leaflet-popup-content .popup-title {
+/* Leaflet 팝업 — scoped 환경에서 body 직속 DOM에 적용되도록 전부 :deep() 사용 */
+:deep(.leaflet-popup-content-wrapper) {
+  border-radius: 10px;
+}
+:deep(.leaflet-popup-content) {
+  margin: 10px 12px;
+  width: 200px !important;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+:deep(.popup-content) {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+:deep(.popup-content img),
+:deep(.popup-thumb) {
+  width: 100%;
+  max-width: 100%;
+  height: 110px;
+  object-fit: cover;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  display: block;
+  box-sizing: border-box;
+}
+:deep(.popup-thumb-empty) {
+  width: 100%;
+  max-width: 100%;
+  height: 110px;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  background: #eef4f4;
+  color: #8fb8b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+:deep(.popup-title) {
   font-weight: 700;
   font-size: 14px;
   margin-bottom: 2px;
 }
-.leaflet-popup-content .popup-addr {
+:deep(.popup-addr) {
   font-size: 12px;
   color: #777;
   margin-bottom: 6px;
+  word-break: break-all;
 }
-.leaflet-popup-content .popup-quiet {
+:deep(.popup-quiet) {
   display: flex;
   align-items: center;
   gap: 6px;
   margin-bottom: 8px;
 }
-.leaflet-popup-content .quiet-badge {
+:deep(.quiet-badge) {
   color: #fff;
   font-weight: 700;
   font-size: 13px;
   padding: 2px 8px;
   border-radius: 10px;
 }
-.leaflet-popup-content .quiet-label {
+:deep(.quiet-label) {
   font-size: 12px;
   color: #555;
 }
-.leaflet-popup-content .write-review-btn {
+:deep(.write-review-btn) {
   width: 100%;
   padding: 7px 8px;
   background: #0b6e6e;
@@ -584,6 +669,7 @@ onBeforeUnmount(() => {
   border-radius: 6px;
   cursor: pointer;
   font-weight: 600;
+  box-sizing: border-box;
 }
 .leaflet-popup-content .popup-thumb {
   width: 100%;
