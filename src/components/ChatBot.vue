@@ -34,7 +34,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue';
+import { ref, onMounted, nextTick, computed } from 'vue';
+import { useQuietPlaces } from '@/composables/usePlaces';
+import { usePosts } from '@/composables/usePosts';
+import { enrichPlaces } from '@/composables/useQuietScore';
 
 // 챗봇 UI 상태 변수
 const isOpen = ref(false);
@@ -49,38 +52,17 @@ const messages = ref([
   }
 ]);
 
-// 로컬 데이터 저장용 변수
-const places = ref([]);
+const { places: sharedPlaces, load: loadPlaces } = useQuietPlaces();
+const { list: listPosts } = usePosts();
 
-// 컴포넌트 마운트 시 JSON 데이터 로드 및 병합
+const enrichedPlaces = computed(() => enrichPlaces(sharedPlaces.value || [], listPosts() || []));
+
+// 기존 fetch 대신 앱 전역 데이터 사용 — 컴포넌트는 장소 로드만 트리거
 onMounted(async () => {
   try {
-    const [placesRes, indexRes] = await Promise.all([
-      fetch('/data/quiet_places_seoul.json').then(r => r.ok ? r.json() : { items: [] }),
-      fetch('/data/quiet_index_lite.json').then(r => r.ok ? r.json() : { items: [] })
-    ]);
-
-    const rawPlaces = placesRes.items || [];
-    const rawIndices = indexRes.items || [];
-
-    // quiet_index_lite.json의 정숙도 평점(q)을 매핑하기 위한 Map 생성
-    const indexMap = new Map();
-    rawIndices.forEach(item => {
-      if (item.id) {
-        indexMap.set(String(item.id), item);
-      }
-    });
-
-    // 두 데이터 병합하여 places에 저장
-    places.value = rawPlaces.map(place => {
-      const matchedIndex = indexMap.get(String(place.contentid));
-      return {
-        ...place,
-        finalQuiet: matchedIndex ? matchedIndex.q : place.baseQuiet || 3
-      };
-    });
+    await loadPlaces();
   } catch (error) {
-    console.error('데이터 로드 실패:', error);
+    console.error('장소 로드 실패:', error);
   }
 });
 
@@ -101,7 +83,7 @@ const toggle = () => {
 };
 
 const findRelevantPlaces = (query) => {
-  if (!places.value.length) return [];
+  if (!(enrichedPlaces.value && enrichedPlaces.value.length)) return [];
 
   const cleanQuery = query.trim().toLowerCase();
   if (!cleanQuery) return [];
@@ -145,7 +127,7 @@ const findRelevantPlaces = (query) => {
   }
 
   // 3. 자치구 및 카테고리에 기반한 1차 검색 실행
-  matched = places.value.filter(place => {
+  matched = enrichedPlaces.value.filter(place => {
     const isGuMatch = targetedGu ? place.gu === targetedGu : true;
     const isCatMatch = targetedCat ? place.catName === targetedCat : true;
     return isGuMatch && isCatMatch;
@@ -157,7 +139,7 @@ const findRelevantPlaces = (query) => {
     const keywords = cleanQuery.split(/\s+/).filter(w => w.length > 1 && !stopWords.includes(w));
 
     if (keywords.length > 0) {
-      matched = places.value.filter(place => {
+      matched = enrichedPlaces.value.filter(place => {
         const searchText = [
           place.title,
           place.addr1,

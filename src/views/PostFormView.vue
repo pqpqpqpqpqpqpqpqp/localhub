@@ -36,6 +36,17 @@
             </li>
           </ul>
         </div>
+
+        <div class="form-group stars-group" v-if="form.contentid">
+          <label>이 장소의 조용함 별점 (선택)</label>
+          <div class="stars">
+            <button v-for="s in [1, 2, 3, 4, 5]" :key="s" type="button" :class="{ active: form.quietScore === s }"
+              @click="form.quietScore = s">
+              {{ s }}★
+            </button>
+            <button type="button" v-if="form.quietScore != null" @click="form.quietScore = null">지우기</button>
+          </div>
+        </div>
       </div>
 
       <div class="form-actions">
@@ -64,7 +75,8 @@ const form = ref({
   password: '',
   placeTitle: '',
   contentid: null,
-  lclsSystm3: null
+  lclsSystm3: null,
+  quietScore: null
 });
 
 function extractGu(p) {
@@ -105,6 +117,7 @@ onMounted(async () => {
       form.value.placeTitle = existing.placeTitle || '';
       form.value.contentid = existing.contentid ?? null;
       form.value.lclsSystm3 = existing.lclsSystm3 ?? null;
+      form.value.quietScore = typeof existing.quietScore !== 'undefined' ? existing.quietScore : null;
       query.value = form.value.placeTitle;
     }
   } else if (route.query.contentid) {
@@ -220,7 +233,8 @@ function onSubmit() {
       password: form.value.password,
       placeTitle: form.value.placeTitle,
       contentid: form.value.contentid,
-      lclsSystm3: form.value.lclsSystm3
+      lclsSystm3: form.value.lclsSystm3,
+      quietScore: form.value.quietScore ?? null
     });
     router.push({ name: 'BoardDetail', params: { id: item.id } });
   }
@@ -285,7 +299,7 @@ input:focus,
 textarea:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 4px rgba(79,70,229,0.08);
+  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.08);
 }
 
 .form-actions {
@@ -396,4 +410,31 @@ input.is-linked {
   color: #4f46e5;
   font-weight: 800;
 }
+
+/* Stars UI tweaks */
+.stars-group { grid-column: 1 / -1; }
+.stars {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.stars button {
+  min-width: 56px;
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: linear-gradient(180deg,#eef2ff,#eef6ff);
+  border: 1px solid rgba(79,70,229,0.12);
+  color: #4f46e5;
+  font-weight: 800;
+  cursor: pointer;
+}
+.stars button.active {
+  background: #4f46e5;
+  color: #fff;
+  border-color: #4338ca;
+}
+.stars button:hover { transform: translateY(-2px); }
+.stars button[ v-cloak ] { display: none; }
 </style>

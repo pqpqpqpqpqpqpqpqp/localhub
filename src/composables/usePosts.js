@@ -8,10 +8,38 @@ function loadFromLocal() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
+    // 마이그레이션: contentid가 존재하면 문자열로 통일
+    return Array.isArray(parsed) ? parsed.map(p => ({ ...p, contentid: p.contentid != null ? String(p.contentid) : null })) : [];
   } catch {
     return [];
   }
+}
+
+function byContentId(contentid) {
+  return posts.value
+    .filter(p => String(p.contentid) === String(contentid))
+    .sort(sortByNewest);
+}
+
+function create(data) {
+  const now = new Date().toISOString();
+  const item = {
+    id: crypto.randomUUID(),
+    contentid: data.contentid != null ? String(data.contentid) : null,
+    placeTitle: data.placeTitle ?? '',
+    lclsSystm3: data.lclsSystm3 ?? null,
+    quietScore: (typeof data.quietScore !== 'undefined' && data.quietScore !== null) ? Number(data.quietScore) : null,
+    title: data.title ?? '',
+    content: data.content ?? '',
+    password: data.password ?? '',
+    views: 0,
+    likes: 0,
+    createdAt: now,
+    updatedAt: now
+  };
+  posts.value.push(item);
+  saveToLocal();
+  return item;
 }
 
 function saveToLocal() {
