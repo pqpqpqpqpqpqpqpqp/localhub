@@ -284,8 +284,8 @@ textarea {
 input:focus,
 textarea:focus {
   outline: none;
-  border-color: #4f46e5;
-  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px rgba(79,70,229,0.08);
 }
 
 .form-actions {

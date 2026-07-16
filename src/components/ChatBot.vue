@@ -301,7 +301,7 @@ ${userText}`
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: #4F46E5;
+  background: var(--color-primary);
   color: #fff;
   border: none;
   display: inline-flex;
@@ -309,7 +309,7 @@ ${userText}`
   justify-content: center;
   font-size: 24px;
   cursor: pointer;
-  box-shadow: 0 6px 18px rgba(160, 219, 242, 0.18);
+  box-shadow: 0 6px 18px rgba(79,70,229,0.12);
   transition: transform 0.12s ease;
 }
 
@@ -321,21 +321,21 @@ ${userText}`
   position: absolute;
   right: 0;
   bottom: 74px;
-  background: #fff;
+  background: var(--color-surface);
   border-radius: 12px;
   width: min(360px, 92vw);
   max-height: min(600px, 80vh);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.22), 0 6px 18px rgba(160, 219, 242, 0.08);
-  border: 1px solid rgba(160, 219, 242, 0.12);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.12);
+  border: 1px solid rgba(15,23,42,0.06);
   backdrop-filter: blur(6px);
 }
 
 .panel-header {
-  background: #4F46E5;
-  color: #fff;
+  background: var(--color-primary);
+  color: var(--color-surface);
   padding: 12px 16px;
   font-weight: 600;
   text-align: center;

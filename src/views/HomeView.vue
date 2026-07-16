@@ -111,7 +111,7 @@ function openPlace(p) {
     gap: 1.5rem;
     align-items: center;
     padding: 1.8rem;
-    border-left: 4px solid #4f46e5;
+    border-left: 4px solid var(--color-primary);
     /* 액센트 라인 */
 }
 
@@ -136,20 +136,19 @@ function openPlace(p) {
 
 /* 버튼 스타일 정리 */
 .btn {
-    background: #4f46e5;
-    color: #fff;
+    background: var(--color-primary);
+    color: var(--color-surface);
     padding: 0.7rem 1rem;
     border-radius: 10px;
     border: none;
     cursor: pointer;
     font-weight: 700;
-    box-shadow: 0 6px 16px rgba(79, 70, 229, 0.12);
+    box-shadow: 0 6px 16px rgba(79,70,229,0.12);
 }
-
 .btn.ghost {
     background: transparent;
-    border: 1px solid #e6eefb;
-    color: #475569;
+    border: 1px solid rgba(230,238,251,0.6);
+    color: var(--color-muted);
     box-shadow: none;
 }
 
